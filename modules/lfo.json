@@ -1,0 +1,21 @@
+{
+  "name": "LFO",
+  "color": "#5fb49c",
+  "columns": 2,
+  "description": "Langsamer Oszillator: bewegt andere Regler automatisch, etwa den Filter.",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "Sinus",
+      "kind": "cv"
+    },
+    {
+      "name": "Dreieck",
+      "kind": "cv"
+    },
+    {
+      "name": "Rechteck",
+      "kind": "cv"
+    }
+  ]
+}

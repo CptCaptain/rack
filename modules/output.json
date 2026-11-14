@@ -1,0 +1,22 @@
+{
+  "name": "Output",
+  "color": "#ef476f",
+  "columns": 2,
+  "speakers": true,
+  "description": "Ausgang zu den Lautsprechern, mit Lautstärke und Limiter als Gehörschutz.",
+  "inputs": [
+    {
+      "name": "Mono",
+      "kind": "audio"
+    },
+    {
+      "name": "L",
+      "kind": "audio"
+    },
+    {
+      "name": "R",
+      "kind": "audio"
+    }
+  ],
+  "outputs": []
+}

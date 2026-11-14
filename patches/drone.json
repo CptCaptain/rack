@@ -1,0 +1,169 @@
+{
+	"format": "faust-rack/1",
+	"modules": [
+		{
+			"id": "vco1",
+			"type": "vco",
+			"params": {
+				"/vco/Oktave": -2
+			}
+		},
+		{
+			"id": "vco2",
+			"type": "vco",
+			"params": {
+				"/vco/Oktave": -2,
+				"/vco/Fein": 14
+			}
+		},
+		{
+			"id": "vco3",
+			"type": "vco",
+			"params": {
+				"/vco/Oktave": -1,
+				"/vco/Stimmung": 7,
+				"/vco/FM": 0.05
+			}
+		},
+		{
+			"id": "mixer1",
+			"type": "mixer",
+			"params": {
+				"/mixer/In_1": 0.6,
+				"/mixer/In_2": 0.6,
+				"/mixer/In_3": 0.35
+			}
+		},
+		{
+			"id": "lfo1",
+			"type": "lfo",
+			"params": {
+				"/lfo/Rate": 0.07
+			}
+		},
+		{
+			"id": "lfo2",
+			"type": "lfo",
+			"params": {
+				"/lfo/Rate": 0.11,
+				"/lfo/Tiefe": 0.3
+			}
+		},
+		{
+			"id": "vcf1",
+			"type": "vcf",
+			"params": {
+				"/vcf/Cutoff": 350,
+				"/vcf/Resonanz": 0.55,
+				"/vcf/CV-Anteil": 0.45
+			}
+		},
+		{
+			"id": "reverb1",
+			"type": "reverb",
+			"params": {
+				"/reverb/Dauer": 8,
+				"/reverb/Mix": 0.5
+			}
+		},
+		{
+			"id": "output1",
+			"type": "output",
+			"params": {
+				"/output/Volume": 0.5
+			}
+		}
+	],
+	"cables": [
+		{
+			"from": [
+				"vco1",
+				1
+			],
+			"to": [
+				"mixer1",
+				0
+			]
+		},
+		{
+			"from": [
+				"vco2",
+				1
+			],
+			"to": [
+				"mixer1",
+				1
+			]
+		},
+		{
+			"from": [
+				"vco3",
+				0
+			],
+			"to": [
+				"mixer1",
+				2
+			]
+		},
+		{
+			"from": [
+				"mixer1",
+				0
+			],
+			"to": [
+				"vcf1",
+				0
+			]
+		},
+		{
+			"from": [
+				"lfo1",
+				0
+			],
+			"to": [
+				"vcf1",
+				1
+			]
+		},
+		{
+			"from": [
+				"lfo2",
+				1
+			],
+			"to": [
+				"vco3",
+				1
+			]
+		},
+		{
+			"from": [
+				"vcf1",
+				0
+			],
+			"to": [
+				"reverb1",
+				0
+			]
+		},
+		{
+			"from": [
+				"reverb1",
+				0
+			],
+			"to": [
+				"output1",
+				1
+			]
+		},
+		{
+			"from": [
+				"reverb1",
+				1
+			],
+			"to": [
+				"output1",
+				2
+			]
+		}
+	]
+}

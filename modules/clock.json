@@ -1,0 +1,21 @@
+{
+  "name": "Clock",
+  "color": "#e05a4f",
+  "columns": 2,
+  "description": "Taktgeber: sendet regelmäßige Impulse. Treibt zum Beispiel den Sequencer an.",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "1/4",
+      "kind": "gate"
+    },
+    {
+      "name": "1/8",
+      "kind": "gate"
+    },
+    {
+      "name": "1/16",
+      "kind": "gate"
+    }
+  ]
+}

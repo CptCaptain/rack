@@ -1,0 +1,18 @@
+{
+  "name": "ADSR",
+  "color": "#4ea8de",
+  "columns": 2,
+  "description": "Hüllkurve: macht aus einem Gate einen Verlauf (Anschwellen, Abfallen, Halten, Ausklingen).",
+  "inputs": [
+    {
+      "name": "Gate",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Env",
+      "kind": "cv"
+    }
+  ]
+}

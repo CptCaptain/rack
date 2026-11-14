@@ -1,0 +1,20 @@
+{
+  "name": "faust-rack",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser-Eurorack: Module sind Faust-DSP-Dateien, im Browser zu AudioWorklets kompiliert.",
+  "scripts": {
+    "postinstall": "node scripts/vendor.mjs",
+    "dev": "node scripts/serve.mjs .",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/serve.mjs dist",
+    "check": "node scripts/check.mjs"
+  },
+  "dependencies": {
+    "@grame/faustwasm": "^0.20.2"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.65.1"
+  }
+}

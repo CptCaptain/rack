@@ -1,0 +1,17 @@
+{
+  "name": "Noise",
+  "color": "#b8b8c8",
+  "columns": 1,
+  "description": "Rauschen: Rohmaterial für Wind, Meer und Schlagzeug.",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "Weiß",
+      "kind": "audio"
+    },
+    {
+      "name": "Rosa",
+      "kind": "audio"
+    }
+  ]
+}

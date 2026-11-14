@@ -1,0 +1,18 @@
+{
+  "name": "Keyboard",
+  "color": "#e8e4d8",
+  "widget": "keyboard",
+  "columns": 2,
+  "description": "Tastatur zum Spielen: Maus, Finger oder die Tasten A bis L. Gibt Tonhöhe und Gate aus.",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "Pitch",
+      "kind": "cv"
+    },
+    {
+      "name": "Gate",
+      "kind": "gate"
+    }
+  ]
+}

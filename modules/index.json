@@ -1,0 +1,15 @@
+[
+  "keyboard",
+  "clock",
+  "seq",
+  "vco",
+  "lfo",
+  "noise",
+  "adsr",
+  "vca",
+  "vcf",
+  "mixer",
+  "delay",
+  "reverb",
+  "output"
+]

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Faust Rack</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="bar" inert>
+	<strong>Faust Rack</strong>
+	<button id="btn-add">+ Modul</button>
+	<button id="btn-patches">Patches</button>
+	<button id="btn-export">Export</button>
+	<button id="btn-import">Import</button>
+	<button id="btn-power" aria-pressed="true">Ton</button>
+	<button id="btn-help" aria-label="Hilfe">?</button>
+	<canvas id="scope" width="140" height="32" title="So sieht der Klang am Ausgang aus"></canvas>
+	<span id="status" role="status"></span>
+	<input id="file" type="file" accept=".json,application/json" hidden>
+</header>
+
+<main id="rack"></main>
+
+<dialog id="picker"></dialog>
+
+<dialog id="help">
+	<h2>Faust Rack</h2>
+	<p>Ein modularer Synthesizer im Browser. Jedes <b>Modul</b> kann nur eine Sache: einen Ton erzeugen, ihn filtern, ihn lauter oder leiser machen. Erst die <b>Kabel</b> zwischen den Modulen machen daraus ein Instrument. So eine Verkabelung heißt <b>Patch</b>.</p>
+	<h3>Der typische Weg</h3>
+	<p><b>Clock</b> gibt den Takt, der <b>Sequencer</b> spielt dazu Tonhöhen ab. Der <b>VCO</b> macht daraus einen Ton, der <b>VCF</b> filtert ihn, der <b>VCA</b> öffnet und schließt die Lautstärke. Die <b>ADSR</b>-Hüllkurve sagt dem VCA, wie jeder Ton an- und ausklingt. Am Ende steht immer <b>Output</b>.</p>
+	<h3>Drei Arten Signal</h3>
+	<p><span class="dot audio"></span> <b>Audio</b> ist der Klang selbst. <span class="dot cv"></span> <b>CV</b> ist eine Steuerspannung, sie dreht für dich an einem Regler. <span class="dot gate"></span> <b>Gate</b> heißt an oder aus, wie eine gedrückte Taste. Alles darf in alles gesteckt werden, kaputt geht nichts.</p>
+	<h3>Bedienen</h3>
+	<ul>
+		<li><b>Regler:</b> ziehen, hoch ist mehr. Mit Umschalt feiner, Doppelklick setzt zurück.</li>
+		<li><b>Kabel stecken:</b> von einer Buchse zur anderen ziehen. Ausgänge liegen im hellen Feld.</li>
+		<li><b>Kabel lösen:</b> am Eingang greifen und ins Leere ziehen. Doppelklick auf eine Buchse löst alle Kabel dort.</li>
+		<li><b>Spielen:</b> Im Keyboard-Modul klicken oder die Tasten A bis L drücken, W E T Z U O sind die schwarzen Tasten.</li>
+		<li><b>Kein Ton?</b> Führt ein Kabel bis in den Output? Ist „Ton“ oben an und Volume aufgedreht?</li>
+	</ul>
+	<p>Der Patch wird im Browser gespeichert. Unter „Patches“ liegen Beispiele zum Ausprobieren.</p>
+	<form method="dialog">
+		<span id="progress">Lade Faust-Compiler …</span>
+		<button id="start" disabled>Rack starten</button>
+	</form>
+</dialog>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+{
+	"format": "faust-rack/1",
+	"modules": [
+		{
+			"id": "clock1",
+			"type": "clock",
+			"params": {
+				"/clock/Tempo": 112
+			}
+		},
+		{
+			"id": "seq1",
+			"type": "seq",
+			"params": {
+				"/seq/1": 0,
+				"/seq/2": 12,
+				"/seq/3": 7,
+				"/seq/4": 0,
+				"/seq/5": 10,
+				"/seq/6": 7,
+				"/seq/7": 3,
+				"/seq/8": 12
+			}
+		},
+		{
+			"id": "vco1",
+			"type": "vco",
+			"params": {
+				"/vco/Oktave": -1
+			}
+		},
+		{
+			"id": "adsr1",
+			"type": "adsr",
+			"params": {
+				"/adsr/Attack": 0.005,
+				"/adsr/Decay": 0.25,
+				"/adsr/Sustain": 0.25,
+				"/adsr/Release": 0.2
+			}
+		},
+		{
+			"id": "vcf1",
+			"type": "vcf",
+			"params": {
+				"/vcf/Cutoff": 500,
+				"/vcf/Resonanz": 0.55,
+				"/vcf/CV-Anteil": 0.5
+			}
+		},
+		{
+			"id": "vca1",
+			"type": "vca",
+			"params": {}
+		},
+		{
+			"id": "delay1",
+			"type": "delay",
+			"params": {
+				"/delay/Zeit": 402,
+				"/delay/Feedback": 0.4,
+				"/delay/Mix": 0.3
+			}
+		},
+		{
+			"id": "output1",
+			"type": "output",
+			"params": {}
+		}
+	],
+	"cables": [
+		{
+			"from": [
+				"clock1",
+				1
+			],
+			"to": [
+				"seq1",
+				0
+			]
+		},
+		{
+			"from": [
+				"seq1",
+				0
+			],
+			"to": [
+				"vco1",
+				0
+			]
+		},
+		{
+			"from": [
+				"seq1",
+				1
+			],
+			"to": [
+				"adsr1",
+				0
+			]
+		},
+		{
+			"from": [
+				"vco1",
+				1
+			],
+			"to": [
+				"vcf1",
+				0
+			]
+		},
+		{
+			"from": [
+				"adsr1",
+				0
+			],
+			"to": [
+				"vcf1",
+				1
+			]
+		},
+		{
+			"from": [
+				"vcf1",
+				0
+			],
+			"to": [
+				"vca1",
+				0
+			]
+		},
+		{
+			"from": [
+				"adsr1",
+				0
+			],
+			"to": [
+				"vca1",
+				1
+			]
+		},
+		{
+			"from": [
+				"vca1",
+				0
+			],
+			"to": [
+				"delay1",
+				0
+			]
+		},
+		{
+			"from": [
+				"delay1",
+				0
+			],
+			"to": [
+				"output1",
+				0
+			]
+		}
+	]
+}

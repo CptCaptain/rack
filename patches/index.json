@@ -1,0 +1,22 @@
+[
+	{
+		"file": "erste-sequenz.json",
+		"name": "Erste Sequenz",
+		"description": "Clock und Sequencer spielen eine Melodie. Klingt sofort, dreh am Cutoff."
+	},
+	{
+		"file": "tastatur.json",
+		"name": "Tastatur-Synth",
+		"description": "Zum Selberspielen: zwei Oszillatoren, Filter, Hall. Tasten A bis L."
+	},
+	{
+		"file": "drone.json",
+		"name": "Drone",
+		"description": "Ein stehender, langsam atmender Klang. Kein Takt, nur zuhören und drehen."
+	},
+	{
+		"file": "wind.json",
+		"name": "Wind",
+		"description": "Rauschen durch ein Filter, das zwei LFOs bewegen. Ganz ohne Oszillator."
+	}
+]

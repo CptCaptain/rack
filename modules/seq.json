@@ -1,0 +1,26 @@
+{
+  "name": "Sequencer",
+  "color": "#f08a4b",
+  "columns": 4,
+  "description": "Spielt 8 Tonhöhen der Reihe nach ab. Jeder Clock-Impuls schaltet einen Schritt weiter.",
+  "inputs": [
+    {
+      "name": "Clock",
+      "kind": "gate"
+    },
+    {
+      "name": "Reset",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Pitch",
+      "kind": "cv"
+    },
+    {
+      "name": "Gate",
+      "kind": "gate"
+    }
+  ]
+}

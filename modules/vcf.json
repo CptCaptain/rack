@@ -1,0 +1,22 @@
+{
+  "name": "VCF",
+  "color": "#c65ccf",
+  "columns": 2,
+  "description": "Tiefpassfilter (Moog-Art): schneidet Höhen ab. Resonanz betont die Grenzfrequenz.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "audio"
+    },
+    {
+      "name": "CV",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

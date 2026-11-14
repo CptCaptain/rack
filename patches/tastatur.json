@@ -1,0 +1,209 @@
+{
+	"format": "faust-rack/1",
+	"modules": [
+		{
+			"id": "keyboard1",
+			"type": "keyboard",
+			"params": {}
+		},
+		{
+			"id": "lfo1",
+			"type": "lfo",
+			"params": {
+				"/lfo/Rate": 5.5,
+				"/lfo/Tiefe": 0.15
+			}
+		},
+		{
+			"id": "vco1",
+			"type": "vco",
+			"params": {
+				"/vco/Oktave": -1,
+				"/vco/FM": 0.1
+			}
+		},
+		{
+			"id": "vco2",
+			"type": "vco",
+			"params": {
+				"/vco/Oktave": -1,
+				"/vco/Fein": 9
+			}
+		},
+		{
+			"id": "mixer1",
+			"type": "mixer",
+			"params": {}
+		},
+		{
+			"id": "adsr1",
+			"type": "adsr",
+			"params": {
+				"/adsr/Attack": 0.01,
+				"/adsr/Decay": 0.4,
+				"/adsr/Sustain": 0.5,
+				"/adsr/Release": 0.5
+			}
+		},
+		{
+			"id": "vcf1",
+			"type": "vcf",
+			"params": {
+				"/vcf/Cutoff": 700,
+				"/vcf/Resonanz": 0.4,
+				"/vcf/CV-Anteil": 0.45
+			}
+		},
+		{
+			"id": "vca1",
+			"type": "vca",
+			"params": {}
+		},
+		{
+			"id": "reverb1",
+			"type": "reverb",
+			"params": {
+				"/reverb/Mix": 0.3
+			}
+		},
+		{
+			"id": "output1",
+			"type": "output",
+			"params": {
+				"/output/Volume": 0.4
+			}
+		}
+	],
+	"cables": [
+		{
+			"from": [
+				"keyboard1",
+				0
+			],
+			"to": [
+				"vco1",
+				0
+			]
+		},
+		{
+			"from": [
+				"keyboard1",
+				0
+			],
+			"to": [
+				"vco2",
+				0
+			]
+		},
+		{
+			"from": [
+				"keyboard1",
+				1
+			],
+			"to": [
+				"adsr1",
+				0
+			]
+		},
+		{
+			"from": [
+				"lfo1",
+				0
+			],
+			"to": [
+				"vco1",
+				1
+			]
+		},
+		{
+			"from": [
+				"vco1",
+				1
+			],
+			"to": [
+				"mixer1",
+				0
+			]
+		},
+		{
+			"from": [
+				"vco2",
+				2
+			],
+			"to": [
+				"mixer1",
+				1
+			]
+		},
+		{
+			"from": [
+				"mixer1",
+				0
+			],
+			"to": [
+				"vcf1",
+				0
+			]
+		},
+		{
+			"from": [
+				"adsr1",
+				0
+			],
+			"to": [
+				"vcf1",
+				1
+			]
+		},
+		{
+			"from": [
+				"vcf1",
+				0
+			],
+			"to": [
+				"vca1",
+				0
+			]
+		},
+		{
+			"from": [
+				"adsr1",
+				0
+			],
+			"to": [
+				"vca1",
+				1
+			]
+		},
+		{
+			"from": [
+				"vca1",
+				0
+			],
+			"to": [
+				"reverb1",
+				0
+			]
+		},
+		{
+			"from": [
+				"reverb1",
+				0
+			],
+			"to": [
+				"output1",
+				1
+			]
+		},
+		{
+			"from": [
+				"reverb1",
+				1
+			],
+			"to": [
+				"output1",
+				2
+			]
+		}
+	]
+}

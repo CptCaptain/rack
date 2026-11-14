@@ -1,0 +1,22 @@
+{
+  "name": "VCA",
+  "color": "#7b6cf6",
+  "columns": 1,
+  "description": "Verstärker: lässt so viel Klang durch, wie Pegel und CV zusammen vorgeben.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "audio"
+    },
+    {
+      "name": "CV",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

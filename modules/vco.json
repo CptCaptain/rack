@@ -1,0 +1,30 @@
+{
+  "name": "VCO",
+  "color": "#f2c14e",
+  "columns": 2,
+  "description": "Oszillator: erzeugt den Ton. Der Pitch-Eingang bestimmt die Tonhöhe (+1 = eine Oktave höher).",
+  "inputs": [
+    {
+      "name": "V/Oct",
+      "kind": "cv"
+    },
+    {
+      "name": "FM",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Sinus",
+      "kind": "audio"
+    },
+    {
+      "name": "Säge",
+      "kind": "audio"
+    },
+    {
+      "name": "Rechteck",
+      "kind": "audio"
+    }
+  ]
+}

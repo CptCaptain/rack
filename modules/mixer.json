@@ -1,0 +1,30 @@
+{
+  "name": "Mixer",
+  "color": "#8d99ae",
+  "columns": 2,
+  "description": "Mischt bis zu vier Signale zu einem.",
+  "inputs": [
+    {
+      "name": "In 1",
+      "kind": "audio"
+    },
+    {
+      "name": "In 2",
+      "kind": "audio"
+    },
+    {
+      "name": "In 3",
+      "kind": "audio"
+    },
+    {
+      "name": "In 4",
+      "kind": "audio"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}
