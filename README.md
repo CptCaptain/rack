@@ -20,7 +20,7 @@ npm run build     # schreibt dist/
 npm run preview   # zeigt dist/ auf http://localhost:5173
 ```
 
-`dist/` enthält alles, etwa 7 MB, davon 6,5 MB Faust-Compiler. Jeder Webserver für statische Dateien genügt. Der Browser erlaubt AudioWorklets aber nur über HTTPS oder `localhost`.
+`dist/` enthält alles und ist etwa 7 MB groß. Fast alles davon ist der Faust-Compiler. Jeder Webserver für statische Dateien genügt. Der Browser erlaubt AudioWorklets aber nur über HTTPS oder `localhost`.
 
 COOP- und COEP-Header braucht die Seite nicht, weil sie keinen `SharedArrayBuffer` benutzt.
 
