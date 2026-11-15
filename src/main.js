@@ -207,9 +207,9 @@ function drawScope() {
 }
 
 const compiled = (async () => {
-	modules = await ModuleLibrary.create();
+	modules = new ModuleLibrary();
 	const { failed } = await modules.refresh((id, i, total) => {
-		$("progress").textContent = `Kompiliere Modul ${i + 1} von ${total}: ${id}`;
+		$("progress").textContent = `Lade Modul ${i + 1} von ${total}: ${id}`;
 	});
 	$("progress").textContent = failed.length ? `${failed.length} Modul(e) mit Fehler, siehe Statuszeile.` : "Bereit.";
 	$("start").disabled = false;

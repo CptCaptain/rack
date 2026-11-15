@@ -2,18 +2,13 @@
 // browser's IndexedDB, because it is far too big for the patch.
 // A sample is { name, sampleRate, audioBuffer: [Float32Array] }, the shape faustwasm reads.
 
+import { table } from "./store.js";
+
 const MAX_SECONDS = 10;
 
-const store = () =>
-	new Promise((done, fail) => {
-		const open = indexedDB.open("faust-rack", 1);
-		open.onupgradeneeded = () => open.result.createObjectStore("samples");
-		open.onsuccess = () => done(open.result.transaction("samples", "readwrite").objectStore("samples"));
-		open.onerror = () => fail(open.error);
-	});
-const request = (req) => new Promise((done, fail) => ((req.onsuccess = () => done(req.result)), (req.onerror = () => fail(req.error))));
+const samples = table("faust-rack", "samples");
 
-export const loadSample = async (name) => (await request((await store()).get(name))) ?? null;
+export const loadSample = async (name) => (await samples.get(name)) ?? null;
 
 // Decodes an audio file to one channel of at most ten seconds and keeps it under its file name.
 export async function importSample(ctx, file) {
@@ -25,7 +20,7 @@ export async function importSample(ctx, file) {
 		for (let i = 0; i < frames; i++) mono[i] += data[i] / audio.numberOfChannels;
 	}
 	const sample = { name: file.name, sampleRate: audio.sampleRate, audioBuffer: [mono] };
-	await request((await store()).put(sample, sample.name));
+	await samples.put(sample.name, sample);
 	return sample;
 }
 

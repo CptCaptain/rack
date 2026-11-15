@@ -4,6 +4,8 @@ import {
 	LibFaust,
 	instantiateFaustModuleFromFile,
 } from "../vendor/faustwasm/index.js";
+import { VERSION } from "../vendor/faustwasm/version.js";
+import { table } from "./store.js";
 
 const PORT_KINDS = ["audio", "cv", "gate"];
 // How many voices a polyphonic module runs.
@@ -23,6 +25,38 @@ function parsePorts(id, list, count, what) {
 			throw new Error(`${id}.json: ${what} brauchen name und kind (${PORT_KINDS.join(", ")})`);
 		return { name: port.name, kind: port.kind };
 	});
+}
+
+// Compiled programs, kept in the browser so the next start needs no compiler.
+// Key: a hash of the compiler version and the Faust source. Value: { code, json, used }.
+const programs = table("faust-rack-programs", "programs");
+const KEEP_DAYS = 30;
+
+async function hash(text) {
+	const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+	return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+// The compiled program for this Faust source: from the browser's store if it is there,
+// from the compiler if not. getCompiler is only called in the second case.
+async function program(getCompiler, id, code) {
+	const key = await hash(`${VERSION}\n${id}\n${code}`);
+	const generator = new FaustMonoDspGenerator();
+	const stored = await programs.get(key).catch(() => null);
+	if (stored) {
+		generator.name = id;
+		generator.factory = { cfactory: 0, code: stored.code, module: await WebAssembly.compile(stored.code), json: stored.json, poly: false, shaKey: key, soundfiles: {} };
+		programs.put(key, { ...stored, used: Date.now() }).catch(() => {});
+		return generator;
+	}
+	const compiler = await getCompiler();
+	if (!(await generator.compile(compiler, id, code, "-ftz 2"))) throw new Error(compiler.getErrorMessage() || "Faust-Kompilierung fehlgeschlagen");
+	programs.put(key, { code: generator.factory.code, json: generator.factory.json, used: Date.now() }).catch(() => {});
+	return generator;
+}
+
+async function forgetOldPrograms() {
+	for (const key of await programs.keys()) if (((await programs.get(key))?.used ?? 0) < Date.now() - KEEP_DAYS * 86400000) await programs.delete(key);
 }
 
 const flatten = (items) => items.flatMap((item) => (item.items ? flatten(item.items) : [item]));
@@ -61,10 +95,8 @@ function parseControl(item) {
 	}
 }
 
-export async function compile(compiler, id, info, code) {
-	const generator = new FaustMonoDspGenerator();
-	if (!(await generator.compile(compiler, id, code, "-ftz 2")))
-		throw new Error(compiler.getErrorMessage() || "Faust-Kompilierung fehlgeschlagen");
+export async function compile(getCompiler, id, info, code) {
+	const generator = await program(getCompiler, id, code);
 	const dsp = JSON.parse(generator.factory.json);
 	const speakers = info.speakers === true;
 	const microphone = info.microphone === true;
@@ -101,26 +133,24 @@ export async function compile(compiler, id, info, code) {
 		// The same module once per voice, side by side in one program. Controls with the same
 		// name are one control in Faust, so all voices share the knobs.
 		perVoice: () =>
-			(perVoice ??= (async () => {
-				const copies = new FaustMonoDspGenerator();
-				if (!(await copies.compile(compiler, id, `voice = environment {\n${code}\n}.process;\nprocess = par(i, ${POLY}, voice);\n`, "-ftz 2")))
-					throw new Error(compiler.getErrorMessage() || `${id} lässt sich nicht mehrstimmig kompilieren`);
-				return copies;
-			})()),
+			(perVoice ??= program(getCompiler, id, `voice = environment {\n${code}\n}.process;\nprocess = par(i, ${POLY}, voice);\n`)),
 	};
 }
 
 export class ModuleLibrary {
-	static async create() {
-		const url = new URL("vendor/faustwasm/libfaust-wasm.js", document.baseURI).href;
-		return new ModuleLibrary(new FaustCompiler(new LibFaust(await instantiateFaustModuleFromFile(url))));
-	}
-
-	constructor(compiler) {
-		this.compiler = compiler;
+	constructor() {
 		this.defs = new Map();
 		this.failures = new Map();
+		forgetOldPrograms().catch(() => {});
 	}
+
+	// The Faust compiler is 6 MB to load and start. It is fetched the first time a module is
+	// not in the browser's store, so a start with nothing new skips it.
+	#compiler;
+	compiler = () => {
+		const url = new URL("vendor/faustwasm/libfaust-wasm.js", document.baseURI).href;
+		return (this.#compiler ??= instantiateFaustModuleFromFile(url).then((module) => new FaustCompiler(new LibFaust(module))));
+	};
 
 	// Reads modules/ again and compiles what is new or changed. A module that
 	// fails keeps its last working version; a module dropped from index.json

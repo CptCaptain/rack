@@ -65,6 +65,15 @@ try {
 	console.log(`compile time: ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 	await page.click("#start");
 	await page.waitForFunction(() => window.faustRack, null, { timeout: 60_000 });
+	const coldMs = Date.now() - t0;
+	const t1 = Date.now();
+	await page.reload();
+	await page.waitForSelector("#start:not([disabled])", { timeout: 180_000 });
+	const warmMs = Date.now() - t1;
+	const compilerLoaded = await page.evaluate(() => performance.getEntriesByType("resource").some((entry) => entry.name.includes("libfaust-wasm")));
+	check(!compilerLoaded, `the second start takes its modules from the browser's store and does not load the compiler: ready after ${warmMs} ms, the first start took ${coldMs} ms`);
+	await page.click("#start");
+	await page.waitForFunction(() => window.faustRack, null, { timeout: 60_000 });
 
 	const ids = JSON.parse(readFileSync(`${dir}/modules/index.json`, "utf8"));
 	const state = await page.evaluate(() => ({
@@ -248,6 +257,20 @@ try {
 	const stored = await page.evaluate(() => window.faustRack.rack.toJSON());
 	await page.evaluate((patch) => window.faustRack.openPatch(patch), stored);
 	check((await mods()) === stillMod, "a patch with a modulation loads again");
+
+	// Every module in the menu can be put into a rack, with its panel and display.
+	{
+		await page.evaluate(() => window.faustRack.openPatch({ format: "faust-rack/1", modules: [], cables: [] }));
+		const added = await page.evaluate(async () => {
+			const { rack, view, library } = window.faustRack;
+			for (const id of library.defs.keys()) await rack.add(id);
+			view.render();
+			await new Promise((done) => setTimeout(done, 1500));
+			return { modules: rack.modules.size, panels: document.querySelectorAll(".module").length, types: library.defs.size };
+		});
+		check(added.modules === added.types && added.panels === added.types, `all ${added.types} modules can be added side by side`);
+		await page.evaluate(() => window.faustRack.openPatch({ format: "faust-rack/1", modules: [], cables: [] }));
+	}
 
 	// Sampler: plays the built-in bell, takes a file, and the patch remembers which.
 	{

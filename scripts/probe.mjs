@@ -39,6 +39,11 @@ const probes = [
 	["sampler plays its built-in bell at C4 when triggered", patch(["clock1 Tempo=118", "sampler1"], ["clock1.0 > sampler1.1", "sampler1.0 > output1.0"]), (r) => r.tones[0] / Math.max(r.tones[1], r.tones[2]), between(20, Infinity)],
 	["sampler one octave up no longer sounds at C4", patch(["clock1 Tempo=118", "sampler1 Oktave=1"], ["clock1.0 > sampler1.1", "sampler1.0 > output1.0"]), (r) => r.tones[0] / Math.max(r.tones[1], r.tones[2]), between(0, 5)],
 	["sampler is silent without a trigger", patch(["sampler1"], ["sampler1.0 > output1.0"]), (r) => r.peak, between(0, 0.001)],
+	// One octave only: the output under test clips at 1, which is one octave up.
+	["arp over a seventh chord plays its 4 notes", patch(["clock1 Tempo=118", "arp1 Akkord=2 Oktaven=1"], ["clock1.1 > arp1.1", "arp1.0 > output1.0"]), (r) => r.levels, between(4, 4)],
+	["arp over a fifth plays 2 notes", patch(["clock1 Tempo=118", "arp1 Akkord=3 Oktaven=1"], ["clock1.1 > arp1.1", "arp1.0 > output1.0"]), (r) => r.levels, between(2, 2)],
+	["logic AND of the 1/4 and 1/8 clocks follows the 1/4 clock", patch(["clock1 Tempo=118", "logic1"], ["clock1.0 > logic1.0", "clock1.1 > logic1.1", "logic1.0 > output1.0"]), (r) => r.edges, between(8, 8)],
+	["a Wert module sends the value of its knob", patch(["const1 Wert=0.3"], ["const1.0 > output1.0"]), (r) => r.peak, between(0.29, 0.31)],
 	["random holds a new value per clock", patch(["clock1 Tempo=118", "random1 Bereich=0.5"], ["clock1.1 > random1.0", "random1.0 > output1.0"]), (r) => r.levels, between(13, 16)],
 	["quantizer in major leaves only major-scale notes", patch(["lfo1 Rate=0.5", "quantizer1 Skala=0"], ["lfo1.0 > quantizer1.0", "quantizer1.0 > output1.0"]), (r) => r.offScale, between(0, 0)],
 	["quantizer passes several different notes", patch(["lfo1 Rate=0.5", "quantizer1 Skala=0"], ["lfo1.0 > quantizer1.0", "quantizer1.0 > output1.0"]), (r) => r.levels, between(10, 15)],

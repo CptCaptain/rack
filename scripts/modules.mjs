@@ -15,7 +15,7 @@ let failed = 0;
 for (const id of ids) {
 	try {
 		const info = JSON.parse(readFileSync(`${root}modules/${id}.json`, "utf8"));
-		const def = await compile(compiler, id, info, readFileSync(`${root}modules/${id}.dsp`, "utf8"));
+		const def = await compile(() => compiler, id, info, readFileSync(`${root}modules/${id}.dsp`, "utf8"));
 		const ports = (list) => list.map((port) => port.name).join(", ") || "-";
 		console.log(`ok   ${id}${listed.includes(id) ? "" : " (not in index.json)"}: in ${ports(def.inputs)} | out ${def.speakers ? "speakers" : ports(def.outputs)}`);
 		console.log(`     ${def.controls.map((c) => `${c.address} (${c.type})`).join(", ")}`);
