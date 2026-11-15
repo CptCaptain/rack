@@ -128,7 +128,7 @@ export class RackView {
 		this.rack = rack;
 		this.root = root;
 		this.hint = hint;
-		this.armed = null;
+		this.held = null;
 		this.modulesEl = h("div", { class: "modules" });
 		this.svg = document.createElementNS(SVG, "svg");
 		this.svg.setAttribute("class", "cables");
@@ -140,12 +140,19 @@ export class RackView {
 		// The open box { items, x, y, jack } with the cables and modulations it lists, or null,
 		// and the drawn paths to find a cable by position.
 		this.box = null;
-		this.banner = h("div", { class: "banner", hidden: "" }, h("span", {}, "Jetzt das Ziel antippen: eine Buchse der anderen Art, oder von einem Ausgang aus auch einen Regler."), h("button", {}, "Abbrechen"));
-		this.banner.lastChild.addEventListener("click", () => {
-			this.armed = null;
+		this.banner = h("div", { class: "banner", hidden: "" }, h("span", {}), h("button", { "aria-label": "Kabel weglegen" }, "×"));
+		this.banner.lastChild.addEventListener("click", () => this.#hold(null));
+		document.body.append(this.banner);
+		// The cable in the hand hangs on the mouse pointer. A finger has no position between taps, so there it dangles.
+		this.pointer = null;
+		this.holdMs = 12000;
+		root.addEventListener("pointermove", (e) => {
+			if (!this.held || e.pointerType !== "mouse") return;
+			this.pointer = [e.clientX, e.clientY];
 			this.draw();
 		});
-		document.body.append(this.banner);
+		root.addEventListener("scroll", () => this.held && this.#hold(this.held));
+		addEventListener("keydown", (e) => e.key === "Escape" && this.#hold(null));
 		this.paths = [];
 		rack.onModulated = (id, address, value) => this.modulated.get(`${id} ${address}`)?.(value);
 		root.addEventListener("click", (e) => this.#select(e));
@@ -298,21 +305,28 @@ export class RackView {
 		if (this.box) this.#fillBox(this.box);
 		for (const { item, el } of this.paths) el.classList.toggle("selected", !!this.box?.items.includes(item));
 		const paths = this.paths.map(({ el }) => el);
+		for (const el of this.modulesEl.querySelectorAll(".jack.held")) el.classList.remove("held");
+		const heldEl = this.held && this.#jackEl(this.held);
+		if (heldEl) heldEl.parentElement.classList.add("held");
+		else this.held = null;
+		this.banner.hidden = !this.held;
 		if (loose) paths.push(path(this.#center(loose.anchor), this.#point(loose.x, loose.y), "loose"));
+		else if (this.held) {
+			const [x, y] = this.#center(this.held);
+			paths.push(path([x, y], this.pointer ? this.#point(...this.pointer) : [x + 24, y + 56], "loose"));
+			const def = this.rack.modules.get(this.held.id).def;
+			const name = (this.held.dir === "out" ? def.outputs : def.inputs)[this.held.port].name;
+			this.banner.firstChild.textContent = `Kabel von ${def.name} ${name} in der Hand. ${this.held.dir === "out" ? "Einen Eingang oder einen Regler" : "Einen Ausgang"} antippen.`;
+		}
 		this.svg.replaceChildren(...paths);
-		for (const el of this.modulesEl.querySelectorAll(".jack.armed")) el.classList.remove("armed");
-		const armedEl = this.armed && this.#jackEl(this.armed);
-		if (armedEl) armedEl.parentElement.classList.add("armed");
-		else this.armed = null;
-		this.banner.hidden = !this.armed;
 	}
 
 	#ref(jackEl) {
 		return { id: jackEl.dataset.module, dir: jackEl.dataset.dir, port: Number(jackEl.dataset.port) };
 	}
 
-	// A jack takes two gestures. A drag pulls a cable to another jack. A tap arms the jack,
-	// and a tap on a jack of the other kind then connects the two, with any scrolling in between.
+	// A jack takes two gestures. A drag pulls a cable to another jack. A tap takes a cable into
+	// the hand, and a tap on a jack of the other kind plugs it, with any scrolling in between.
 	#pressJack(down) {
 		const jackEl = down.target.closest(".jack");
 		if (!jackEl) return;
@@ -331,8 +345,7 @@ export class RackView {
 		const move = (e) => {
 			last = e;
 			if (anchor || Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < 8) return;
-			this.armed = null;
-			this.box = null;
+			this.#hold(null);
 			anchor = this.#grab(this.#ref(jackEl));
 			follow();
 		};
@@ -381,19 +394,20 @@ export class RackView {
 	}
 
 	#tapControl(e) {
-		const controlEl = this.armed?.dir === "out" && e.target.closest(".control[data-address]");
+		const controlEl = this.held?.dir === "out" && e.target.closest(".control[data-address]");
 		if (!controlEl) return;
 		e.stopPropagation();
 		e.preventDefault();
-		this.#modulate(this.armed, controlEl);
-		this.armed = null;
-		this.draw();
+		this.#modulate(this.held, controlEl);
+		this.#hold(null);
 	}
 
-	// A tap on a cable or on a jack opens a small box that lists the cables there: one button
+	// A tap on a cable opens a small box that lists the cables under the finger: one button
 	// each to remove exactly that cable, and for a modulation how far it moves the knob.
+	// A tap beside everything puts a held cable away.
 	#select(e) {
 		if (e.target.closest(".popover, .banner, .jack")) return;
+		if (this.held) return this.#hold(null);
 		const [x, y] = this.#point(e.clientX, e.clientY);
 		const reach = (el) => {
 			const length = el.getTotalLength();
@@ -406,11 +420,11 @@ export class RackView {
 		};
 		const onControl = e.target.closest(".control, button, select, .keys, .pads");
 		const near = onControl ? [] : this.paths.map((entry) => ({ ...entry, far: reach(entry.el) })).filter((entry) => entry.far < 14);
-		this.box = near.length ? { items: near.sort((a, b) => a.far - b.far).map((entry) => entry.item), x, y, jack: null } : null;
+		this.box = near.length ? { items: near.sort((a, b) => a.far - b.far).map((entry) => entry.item), x, y } : null;
 		this.draw();
 	}
 
-	#fillBox({ items, x, y, jack }) {
+	#fillBox({ items, x, y }) {
 		const def = (id) => this.rack.modules.get(id).def;
 		const rows = items.map((item) => {
 			const source = `${def(item.from[0]).name} ${def(item.from[0]).outputs[item.from[1]].name}`;
@@ -427,34 +441,25 @@ export class RackView {
 			depth.addEventListener("input", () => this.rack.setDepth(item, Number(depth.value)));
 			return h("div", {}, row, h("label", {}, "Stärke und Richtung", depth));
 		});
-		if (jack) {
-			// Connecting by taps starts here and nowhere else, so a tap on a jack alone never plugs a cable.
-			const connect = h("button", { class: "connect" }, "Von hier verbinden …");
-			connect.addEventListener("click", () => {
-				this.armed = jack;
-				this.box = null;
-				this.draw();
-			});
-			if (!rows.length) rows.push(h("span", {}, "Kein Kabel an dieser Buchse."));
-			rows.push(connect);
-		}
 		this.popover.replaceChildren(...rows);
 		this.popover.style.left = `${Math.max(4, x - 110)}px`;
 		this.popover.style.top = `${y + 16}px`;
 	}
 
-	#tap(ref) {
-		const armed = this.armed;
-		this.armed = null;
+	// A tap on a jack takes a cable from it into the hand. The cable is drawn, a bar says so, and
+	// it goes back by itself after a while, so a forgotten tap never plugs a cable minutes later.
+	#hold(ref) {
+		this.held = ref;
 		this.box = null;
-		const same = armed && armed.id === ref.id && armed.dir === ref.dir && armed.port === ref.port;
-		if (armed && armed.dir !== ref.dir) this.#join(armed, ref);
-		else if (!same) {
-			const end = ref.dir === "out" ? "from" : "to";
-			const items = [...this.rack.cables, ...(ref.dir === "out" ? this.rack.mods : [])].filter((c) => c[end][0] === ref.id && c[end][1] === ref.port);
-			const [x, y] = this.#center(ref);
-			this.box = { items, x, y, jack: ref };
-		}
+		clearTimeout(this.holdTimer);
+		if (ref) this.holdTimer = setTimeout(() => this.#hold(null), this.holdMs);
 		this.draw();
+	}
+
+	#tap(ref) {
+		const held = this.held;
+		const same = held && held.id === ref.id && held.dir === ref.dir && held.port === ref.port;
+		if (held && held.dir !== ref.dir) this.#join(held, ref);
+		this.#hold(!held || (held.dir === ref.dir && !same) ? ref : null);
 	}
 }

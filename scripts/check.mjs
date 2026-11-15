@@ -107,33 +107,36 @@ try {
 	check((await cables()) === first.cables.length, "dragging from output jack to input jack adds a cable");
 	check((await peak()) > 0.005, "signal is back");
 
-	// Regression: plain taps on jacks once armed them, so tapping two jacks in a row plugged a cable nobody asked for.
+	// A tap takes a cable into the hand. It must be visible, easy to put away, and never linger:
+	// an invisible, lingering version of this once plugged cables nobody asked for.
+	const holding = async () => (await page.locator(".jack.held").count()) + (await page.locator(".cables .loose").count()) + ((await page.locator(".banner").isVisible()) ? 1 : 0);
+	await page.click(jack("vco1", "out", 0));
+	check((await holding()) === 3, `a tap on a jack shows the cable in the hand: ${await page.textContent(".banner span")}`);
+	await page.mouse.click(700, 700);
+	await page.click(jack("output1", "in", 1));
+	check((await cables()) === first.cables.length && (await holding()) === 3, "a tap beside the modules puts it away, so the next jack starts a new cable");
+	await page.keyboard.press("Escape");
+	check((await holding()) === 0, "Escape puts it away");
+	await page.evaluate(() => (window.faustRack.view.holdMs = 400));
+	await page.click(jack("vco1", "out", 2));
+	await page.waitForTimeout(700);
+	await page.click(jack("vcf1", "in", 1));
+	await page.keyboard.press("Escape");
+	check((await cables()) === first.cables.length, "a cable left in the hand goes back by itself and plugs nothing later");
+	await page.evaluate(() => (window.faustRack.view.holdMs = 12000));
 	await page.click(jack("vco1", "out", 0));
 	await page.click(jack("output1", "in", 1));
-	await page.click(jack("vco1", "out", 2));
-	await page.click(jack("vcf1", "in", 1));
-	check((await cables()) === first.cables.length && (await page.locator(".jack.armed").count()) === 0, "tapping jacks one after another connects nothing");
-	await page.click(jack("vco1", "out", 0));
-	await page.click(".popover .connect");
-	check((await page.locator(".jack.armed").count()) === 1 && (await page.locator(".banner").isVisible()), "the box's connect button arms the jack and says so");
-	await page.click(jack("output1", "in", 1));
-	check((await cables()) === first.cables.length + 1 && (await page.locator(".jack.armed").count()) === 0 && (await page.locator(".banner").isHidden()), "the next tap on a jack of the other kind connects the two");
-	await page.click(jack("vco1", "out", 2));
-	await page.click(".popover .connect");
-	await page.click(".banner button");
-	await page.click(jack("vcf1", "in", 1));
-	check((await cables()) === first.cables.length + 1, "cancelling disarms");
+	check((await cables()) === first.cables.length + 1 && (await holding()) === 0, "a tap on a jack of the other kind plugs the held cable");
 
 	// Phone: the rack is taller than the screen, so the two ends of a cable are never both visible.
 	await page.setViewportSize({ width: 390, height: 700 });
 	const scrollTop = () => page.evaluate(() => document.getElementById("rack").scrollTop);
 	await page.evaluate(() => document.getElementById("rack").scrollTo(0, 0));
 	await page.click(jack("clock1", "out", 2));
-	await page.click(".popover .connect");
 	await page.evaluate(() => document.getElementById("rack").scrollTo(0, 1e6));
 	const scrolled = await scrollTop();
 	await page.click(jack("output1", "in", 2));
-	check(scrolled > 500 && (await cables()) === first.cables.length + 2, `on a phone: tap, connect, scroll ${scrolled} px, tap connects`);
+	check(scrolled > 500 && (await cables()) === first.cables.length + 2, `on a phone: tap, scroll ${scrolled} px, tap connects`);
 	await page.evaluate(() => document.getElementById("rack").scrollTo(0, 0));
 	const from = await center(jack("clock1", "out", 0));
 	await page.mouse.move(...from);
@@ -186,14 +189,14 @@ try {
 	const dotted = await page.locator(`${knob("/vco/Stimmung")}[data-mod]`).count();
 	check(moving.values.length >= 5 && moving.values.every(Number.isInteger) && moving.values[0] >= -6 && moving.values.at(-1) <= 6 && moving.base === "untouched" && dotted === 1, `a cable dropped on a knob modulates it in whole steps, values ${moving.values.join(" ")}, knob itself ${moving.base}`);
 	await page.click(jack("lfo1", "out", 1));
-	await page.click(".popover .connect");
 	await page.click(knob("/vco/Fein"));
 	await page.waitForFunction(() => window.faustRack.rack.mods.length === 2);
 	check(true, `tapping an output and then a knob modulates too: ${await mods()}`);
 
-	// Tapping a cable selects exactly that one. The point is on the cable, off every control and off the other cables.
-	const tapPath = async (index) => {
-		const point = await page.evaluate((index) => {
+	// Taps a point on a drawn cable that is off every control. Alone: away from all other cables.
+	// With beside: where that other cable runs close, as two cables into one jack do.
+	const tapPath = async (index, beside) => {
+		const point = await page.evaluate(([index, beside]) => {
 			const { view } = window.faustRack;
 			const root = document.getElementById("rack").getBoundingClientRect();
 			const sample = (el) => Array.from({ length: 81 }, (_, i) => el.getPointAtLength((el.getTotalLength() * i) / 80));
@@ -201,10 +204,12 @@ try {
 			for (const p of sample(view.paths[index].el)) {
 				const [x, y] = [root.left + p.x - document.getElementById("rack").scrollLeft, root.top + p.y - document.getElementById("rack").scrollTop];
 				const under = document.elementFromPoint(x, y);
-				if (under && !under.closest(".jack, .control, button, select") && others.every((o) => Math.hypot(o.x - p.x, o.y - p.y) > 20)) return [x, y];
+				const apart = (list) => Math.min(...list.map((o) => Math.hypot(o.x - p.x, o.y - p.y)));
+				const fits = beside === undefined ? apart(others) > 20 : apart(sample(view.paths[beside].el)) < 6;
+				if (under && !under.closest(".jack, .control, button, select") && fits) return [x, y];
 			}
 			return null;
-		}, index);
+		}, [index, beside]);
 		await page.mouse.click(...point);
 	};
 	await tapPath(2);
@@ -215,11 +220,11 @@ try {
 	await page.waitForTimeout(150);
 	const stillMod = await mods();
 	check(stillMod === "lfo1:1>/vco/Fein@0.25" && (await page.evaluate(() => window.faustRack.rack.modules.get("vco1").node.getParamValue("/vco/Stimmung"))) === 0, `removing it leaves the other and puts the knob back: ${stillMod}`);
-	await page.click(jack("output1", "in", 0));
+	await tapPath(0, 1);
 	const listed = await page.locator(".popover .row span").allTextContents();
 	await page.click('.popover .row:has-text("Säge") button');
 	const left = await page.evaluate(() => window.faustRack.rack.cables.map((c) => `${c.from.join(":")}>${c.to.join(":")}`).join(" "));
-	check(listed.length === 2 && left === "vco1:0>output1:0", `a tap on an input with two cables lists both (${listed.join(" | ")}); removing one leaves ${left}`);
+	check(listed.length === 2 && left === "vco1:0>output1:0", `a tap where two cables run together lists both (${listed.join(" | ")}); removing one leaves ${left}`);
 	const stored = await page.evaluate(() => window.faustRack.rack.toJSON());
 	await page.evaluate((patch) => window.faustRack.openPatch(patch), stored);
 	check((await mods()) === stillMod, "a patch with a modulation loads again");

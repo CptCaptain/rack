@@ -89,8 +89,8 @@ select { font: inherit; font-size: 11px; color: inherit; background: #111216; bo
 .learning .control.target { outline: 2px solid var(--text); }
 .control[data-cc]::before { content: attr(data-cc); position: absolute; top: -4px; right: 0; padding: 0 3px; border-radius: 6px; background: var(--cv); color: #000; font-size: 9px; }
 .note { margin: 0 8px; color: var(--dim); font-size: 11px; text-align: center; }
-.jack.armed i { box-shadow: 0 0 0 3px var(--text); animation: armed 0.8s ease-in-out infinite alternate; }
-@keyframes armed { to { box-shadow: 0 0 0 7px rgb(255 255 255 / 0.25); } }
+.jack.held i { box-shadow: 0 0 0 3px var(--text); animation: held 0.8s ease-in-out infinite alternate; }
+@keyframes held { to { box-shadow: 0 0 0 7px rgb(255 255 255 / 0.25); } }
 .cables .mod { stroke-width: 3; stroke-dasharray: 7 5; }
 .cables .selected { stroke: #fff; opacity: 1; }
 .dial[data-mod]::before { content: ""; position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px; border-radius: 50%; background: var(--cv); transform: rotate(calc((var(--mod) - var(--turn)) * 270deg)) translateY(-24px); }
