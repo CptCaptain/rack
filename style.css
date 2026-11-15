@@ -101,3 +101,6 @@ select { font: inherit; font-size: 11px; color: inherit; background: #111216; bo
 .popover .row { display: flex; align-items: center; gap: 6px; }
 .popover .row span { flex: 1; }
 .popover .row button { min-height: 36px; min-width: 36px; padding: 0; }
+.banner { position: fixed; z-index: 4; left: 50%; bottom: 12px; translate: -50%; display: flex; align-items: center; gap: 10px; width: min(460px, 94vw); padding: 8px 10px; background: var(--panel); border: 1px solid var(--text); border-radius: 10px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.5); }
+.banner[hidden] { display: none; }
+.banner span { flex: 1; }

@@ -137,8 +137,15 @@ export class RackView {
 		this.outputs = new Map();
 		this.values = new Map();
 		this.modulated = new Map();
-		// The cables and modulations listed in the box, and the drawn paths to find a cable by position.
-		this.selected = [];
+		// The open box { items, x, y, jack } with the cables and modulations it lists, or null,
+		// and the drawn paths to find a cable by position.
+		this.box = null;
+		this.banner = h("div", { class: "banner", hidden: "" }, h("span", {}, "Jetzt das Ziel antippen: eine Buchse der anderen Art, oder von einem Ausgang aus auch einen Regler."), h("button", {}, "Abbrechen"));
+		this.banner.lastChild.addEventListener("click", () => {
+			this.armed = null;
+			this.draw();
+		});
+		document.body.append(this.banner);
 		this.paths = [];
 		rack.onModulated = (id, address, value) => this.modulated.get(`${id} ${address}`)?.(value);
 		root.addEventListener("click", (e) => this.#select(e));
@@ -187,6 +194,7 @@ export class RackView {
 		this.outputs.clear();
 		this.values.clear();
 		this.modulated.clear();
+		this.box = null;
 		this.root.classList.toggle("learning", this.learning);
 		this.modulesEl.replaceChildren(...[...this.rack.modules.values()].map((inst) => this.#panel(inst)));
 		this.draw();
@@ -282,9 +290,13 @@ export class RackView {
 			...this.rack.cables.map((cable) => ({ item: cable, el: path(start(cable.from), this.#center({ id: cable.to[0], dir: "in", port: cable.to[1] }), kindOf(cable.from)) })),
 			...this.rack.mods.map((mod) => ({ item: mod, el: path(start(mod.from), this.#centerOf(this.#controlEl(mod.to).firstChild), `${kindOf(mod.from)} mod`) })),
 		];
-		this.selected = this.selected.filter((item) => this.paths.some((entry) => entry.item === item));
-		this.popover.hidden = !this.selected.length;
-		for (const { item, el } of this.paths) el.classList.toggle("selected", this.selected.includes(item));
+		if (this.box) {
+			this.box.items = this.box.items.filter((item) => this.paths.some((entry) => entry.item === item));
+			if (!this.box.items.length && !this.box.jack) this.box = null;
+		}
+		this.popover.hidden = !this.box;
+		if (this.box) this.#fillBox(this.box);
+		for (const { item, el } of this.paths) el.classList.toggle("selected", !!this.box?.items.includes(item));
 		const paths = this.paths.map(({ el }) => el);
 		if (loose) paths.push(path(this.#center(loose.anchor), this.#point(loose.x, loose.y), "loose"));
 		this.svg.replaceChildren(...paths);
@@ -292,6 +304,7 @@ export class RackView {
 		const armedEl = this.armed && this.#jackEl(this.armed);
 		if (armedEl) armedEl.parentElement.classList.add("armed");
 		else this.armed = null;
+		this.banner.hidden = !this.armed;
 	}
 
 	#ref(jackEl) {
@@ -319,6 +332,7 @@ export class RackView {
 			last = e;
 			if (anchor || Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < 8) return;
 			this.armed = null;
+			this.box = null;
 			anchor = this.#grab(this.#ref(jackEl));
 			follow();
 		};
@@ -373,15 +387,13 @@ export class RackView {
 		e.preventDefault();
 		this.#modulate(this.armed, controlEl);
 		this.armed = null;
-		this.selected = [];
-		this.hint("");
 		this.draw();
 	}
 
-	// A tap on a cable, or on a jack that has cables, lists those cables in a small box:
-	// one button each to remove exactly that cable, and for a modulation how far it moves the knob.
+	// A tap on a cable or on a jack opens a small box that lists the cables there: one button
+	// each to remove exactly that cable, and for a modulation how far it moves the knob.
 	#select(e) {
-		if (e.target.closest(".popover, .jack")) return;
+		if (e.target.closest(".popover, .banner, .jack")) return;
 		const [x, y] = this.#point(e.clientX, e.clientY);
 		const reach = (el) => {
 			const length = el.getTotalLength();
@@ -394,41 +406,55 @@ export class RackView {
 		};
 		const onControl = e.target.closest(".control, button, select, .keys, .pads");
 		const near = onControl ? [] : this.paths.map((entry) => ({ ...entry, far: reach(entry.el) })).filter((entry) => entry.far < 14);
-		this.#list(near.sort((a, b) => a.far - b.far).map((entry) => entry.item), x, y);
+		this.box = near.length ? { items: near.sort((a, b) => a.far - b.far).map((entry) => entry.item), x, y, jack: null } : null;
+		this.draw();
 	}
 
-	#list(items, x, y) {
-		this.selected = items;
-		const name = (id) => this.rack.modules.get(id).def;
+	#fillBox({ items, x, y, jack }) {
+		const def = (id) => this.rack.modules.get(id).def;
 		const rows = items.map((item) => {
-			const source = `${name(item.from[0]).name} ${name(item.from[0]).outputs[item.from[1]].name}`;
-			const target = item.tap ? name(item.to[0]).controls.find((c) => c.address === item.to[1]).label : name(item.to[0]).inputs[item.to[1]].name;
+			const source = `${def(item.from[0]).name} ${def(item.from[0]).outputs[item.from[1]].name}`;
+			const target = item.tap ? def(item.to[0]).controls.find((c) => c.address === item.to[1]).label : def(item.to[0]).inputs[item.to[1]].name;
 			const remove = h("button", { "aria-label": "Kabel entfernen", title: "Kabel entfernen" }, "×");
 			remove.addEventListener("click", () => {
 				item.tap ? this.rack.unmodulate(item) : this.rack.disconnect(item);
-				this.#list(items.filter((other) => other !== item), x, y);
+				this.draw();
 			});
-			const row = h("div", { class: "row" }, h("span", {}, `${source} → ${name(item.to[0]).name} ${target}`), remove);
+			const row = h("div", { class: "row" }, h("span", {}, `${source} → ${def(item.to[0]).name} ${target}`), remove);
 			if (!item.tap) return row;
 			const depth = h("input", { type: "range", min: "-1", max: "1", step: "0.01", "aria-label": "Stärke und Richtung" });
 			depth.value = item.depth;
 			depth.addEventListener("input", () => this.rack.setDepth(item, Number(depth.value)));
 			return h("div", {}, row, h("label", {}, "Stärke und Richtung", depth));
 		});
+		if (jack) {
+			// Connecting by taps starts here and nowhere else, so a tap on a jack alone never plugs a cable.
+			const connect = h("button", { class: "connect" }, "Von hier verbinden …");
+			connect.addEventListener("click", () => {
+				this.armed = jack;
+				this.box = null;
+				this.draw();
+			});
+			if (!rows.length) rows.push(h("span", {}, "Kein Kabel an dieser Buchse."));
+			rows.push(connect);
+		}
 		this.popover.replaceChildren(...rows);
 		this.popover.style.left = `${Math.max(4, x - 110)}px`;
 		this.popover.style.top = `${y + 16}px`;
-		this.draw();
 	}
 
 	#tap(ref) {
-		const same = this.armed && this.armed.id === ref.id && this.armed.dir === ref.dir && this.armed.port === ref.port;
-		const connects = this.armed && this.armed.dir !== ref.dir;
-		if (connects) this.#join(this.armed, ref);
-		this.armed = connects || same ? null : ref;
-		this.hint(this.armed ? "Buchse gewählt. Jetzt die Buchse am anderen Ende antippen, auch nach dem Scrollen. Ein Ausgang geht auch auf einen Regler. Nochmal antippen bricht ab." : "");
-		const end = ref.dir === "out" ? "from" : "to";
-		const here = [...this.rack.cables, ...(ref.dir === "out" ? this.rack.mods : [])].filter((c) => c[end][0] === ref.id && c[end][1] === ref.port);
-		this.#list(this.armed ? here : [], ...this.#center(ref));
+		const armed = this.armed;
+		this.armed = null;
+		this.box = null;
+		const same = armed && armed.id === ref.id && armed.dir === ref.dir && armed.port === ref.port;
+		if (armed && armed.dir !== ref.dir) this.#join(armed, ref);
+		else if (!same) {
+			const end = ref.dir === "out" ? "from" : "to";
+			const items = [...this.rack.cables, ...(ref.dir === "out" ? this.rack.mods : [])].filter((c) => c[end][0] === ref.id && c[end][1] === ref.port);
+			const [x, y] = this.#center(ref);
+			this.box = { items, x, y, jack: ref };
+		}
+		this.draw();
 	}
 }
