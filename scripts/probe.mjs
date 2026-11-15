@@ -44,6 +44,8 @@ const probes = [
 	["ringmod of two sines is audible", patch(["vco1", "vco2 Stimmung=7", "ringmod1"], ["vco1.0 > ringmod1.0", "vco2.0 > ringmod1.1", "ringmod1.0 > output1.0"]), (r) => r.peak, between(0.7, 1)],
 	["ringmod is silent with one input open", patch(["vco1", "ringmod1"], ["vco1.0 > ringmod1.0", "ringmod1.0 > output1.0"]), (r) => r.peak, between(0, 0.001)],
 	["scale halves a sine", patch(["vco1", "scale1 Faktor=0.5"], ["vco1.0 > scale1.0", "scale1.0 > output1.0"]), (r) => r.peak, between(0.49, 0.51)],
+	["limiter holds three loud oscillators at its ceiling of 0.7", { format: "faust-rack/1", modules: [{ id: "vco1", type: "vco", params: {} }, { id: "vco2", type: "vco", params: { "/vco/Stimmung": 7 } }, { id: "vco3", type: "vco", params: { "/vco/Oktave": 1 } }, { id: "output1", type: "output", params: { "/output/Volume": 1 } }], cables: [{ from: ["vco1", 2], to: ["output1", 0] }, { from: ["vco2", 2], to: ["output1", 0] }, { from: ["vco3", 1], to: ["output1", 0] }] }, (r) => r.peak, between(0.6, 0.7001)],
+	["limiter leaves a quiet sine alone", { format: "faust-rack/1", modules: [{ id: "vco1", type: "vco", params: {} }, { id: "output1", type: "output", params: { "/output/Volume": 0.5 } }], cables: [{ from: ["vco1", 0], to: ["output1", 0] }] }, (r) => r.peak, between(0.49, 0.51)],
 	["scale offset shifts a silent input", patch(["scale1 Offset=0.3"], ["scale1.0 > output1.0"]), (r) => r.peak, between(0.29, 0.31)],
 ];
 
