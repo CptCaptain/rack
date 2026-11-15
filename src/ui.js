@@ -10,6 +10,8 @@ const WIDGETS = { keyboard, pads, midiout, life };
 const SVG = "http://www.w3.org/2000/svg";
 // While a cable is dragged this close to the rack's edge, the rack scrolls.
 const EDGE = 50;
+// Holding a jack this long opens the list of its cables. A shorter press is a tap.
+const LONG_PRESS_MS = 500;
 
 export function h(tag, attrs = {}, ...children) {
 	const el = document.createElement(tag);
@@ -140,9 +142,12 @@ export class RackView {
 		this.outputs = new Map();
 		this.values = new Map();
 		this.modulated = new Map();
-		// The open box { items, x, y, jack } with the cables and modulations it lists, or null,
-		// and the drawn paths to find a cable by position.
+		// The open list of cables and modulations, or null: { items, active, jack, x, y }. active is
+		// the chosen entry, jack the jack the list belongs to if a long press opened it.
+		// paths are the drawn cables, to find one by position.
 		this.box = null;
+		addEventListener("keydown", (e) => this.#keyInBox(e), true);
+		this.modulesEl.addEventListener("contextmenu", (e) => e.target.closest(".jack") && e.preventDefault());
 		this.banner = h("div", { class: "banner", hidden: "" }, h("span", {}), h("button", { "aria-label": "Kabel weglegen" }, "×"));
 		this.banner.lastChild.addEventListener("click", () => this.#hold(null));
 		document.body.append(this.banner);
@@ -313,12 +318,15 @@ export class RackView {
 			...this.rack.mods.map((mod) => ({ item: mod, el: path(start(mod.from), this.#centerOf(this.#controlEl(mod.to).firstChild), `${kindOfLive(mod.from)} mod`) })),
 		];
 		if (this.box) {
+			const before = this.box.items.length;
 			this.box.items = this.box.items.filter((item) => this.paths.some((entry) => entry.item === item));
-			if (!this.box.items.length && !this.box.jack) this.box = null;
+			this.box.active = Math.min(this.box.active, this.box.items.length - 1);
+			// The list stays open while it has cables. It closes with its last one.
+			if (before && !this.box.items.length) this.box = null;
 		}
 		this.popover.hidden = !this.box;
 		if (this.box) this.#fillBox(this.box);
-		for (const { item, el } of this.paths) el.classList.toggle("selected", !!this.box?.items.includes(item));
+		for (const { item, el } of this.paths) el.classList.toggle("selected", this.box?.items[this.box.active] === item);
 		const paths = this.paths.map(({ el }) => el);
 		for (const el of this.modulesEl.querySelectorAll(".jack.held")) el.classList.remove("held");
 		const heldEl = this.held && this.#jackEl(this.held);
@@ -349,6 +357,11 @@ export class RackView {
 		jackEl.setPointerCapture(down.pointerId);
 		let anchor = null;
 		let last = down;
+		let listed = false;
+		const longPress = setTimeout(() => {
+			listed = true;
+			this.#listJack(this.#ref(jackEl));
+		}, LONG_PRESS_MS);
 		const follow = () => {
 			if (!anchor) return;
 			const box = this.root.getBoundingClientRect();
@@ -359,7 +372,8 @@ export class RackView {
 		};
 		const move = (e) => {
 			last = e;
-			if (anchor || Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < 8) return;
+			if (anchor || listed || Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < 8) return;
+			clearTimeout(longPress);
 			this.#hold(null);
 			anchor = this.#grab(this.#ref(jackEl));
 			follow();
@@ -370,7 +384,8 @@ export class RackView {
 			jackEl.removeEventListener("pointercancel", end);
 			const dragged = anchor;
 			anchor = null;
-			if (e.type !== "pointerup") return this.draw();
+			clearTimeout(longPress);
+			if (e.type !== "pointerup" || listed) return this.draw();
 			if (!dragged) return this.#tap(this.#ref(jackEl));
 			const under = document.elementFromPoint(e.clientX, e.clientY);
 			const target = under?.closest(".jack");
@@ -435,29 +450,76 @@ export class RackView {
 		};
 		const onControl = e.target.closest(".control, button, select, .keys, .pads");
 		const near = onControl ? [] : this.paths.map((entry) => ({ ...entry, far: reach(entry.el) })).filter((entry) => entry.far < 14);
-		this.box = near.length ? { items: near.sort((a, b) => a.far - b.far).map((entry) => entry.item), x, y } : null;
+		this.box = near.length ? { items: near.sort((a, b) => a.far - b.far).map((entry) => entry.item), active: 0, jack: null, x, y } : null;
 		this.draw();
 	}
 
-	#fillBox({ items, x, y }) {
+	// A long press on a jack lists every cable plugged there.
+	#listJack(ref) {
+		this.#hold(null);
+		const end = ref.dir === "out" ? "from" : "to";
+		const items = [...this.rack.cables, ...(ref.dir === "out" ? this.rack.mods : [])].filter((c) => c[end][0] === ref.id && c[end][1] === ref.port);
+		const [x, y] = this.#center(ref);
+		document.activeElement?.blur();
+		this.box = { items, active: 0, jack: ref, x, y };
+		this.draw();
+	}
+
+	#remove(item) {
+		item.tap ? this.rack.unmodulate(item) : this.rack.disconnect(item);
+		this.draw();
+	}
+
+	// With the list open: arrows choose an entry, Delete or Backspace removes its cable.
+	// Escape closes the list like it puts a held cable away.
+	#keyInBox(e) {
+		if (!this.box?.items.length || e.target.closest?.("input, select, textarea")) return;
+		const step = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+		if (!step && e.key !== "Delete" && e.key !== "Backspace") return;
+		e.preventDefault();
+		e.stopPropagation();
+		const count = this.box.items.length;
+		if (!step) return this.#remove(this.box.items[this.box.active]);
+		this.box.active = (this.box.active + step + count) % count;
+		this.draw();
+	}
+
+	#fillBox(box) {
+		const { items, active, jack, x, y } = box;
+		// Drawing the cables runs often. The list is only rebuilt when it changed, so a finger on its slider stays there.
+		const shown = `${items.map((item) => this.paths.findIndex((entry) => entry.item === item)).join()} ${active}`;
+		if (box.shown === shown) return;
+		box.shown = shown;
 		const def = (id) => this.rack.modules.get(id).def;
-		const rows = items.map((item) => {
+		const rows = items.map((item, index) => {
 			const source = `${def(item.from[0]).name} ${def(item.from[0]).outputs[item.from[1]].name}`;
-			const target = item.tap ? def(item.to[0]).controls.find((c) => c.address === item.to[1]).label : def(item.to[0]).inputs[item.to[1]].name;
-			const remove = h("button", { "aria-label": "Kabel entfernen", title: "Kabel entfernen" }, "×");
-			remove.addEventListener("click", () => {
-				item.tap ? this.rack.unmodulate(item) : this.rack.disconnect(item);
+			const target = `${def(item.to[0]).name} ${item.tap ? def(item.to[0]).controls.find((c) => c.address === item.to[1]).label : def(item.to[0]).inputs[item.to[1]].name}`;
+			// Seen from a jack, an entry names the other end. Without a jack it names both.
+			const label = !jack ? `${source} → ${target}` : jack.dir === "in" ? source : target;
+			const remove = h("button", { "aria-label": `Kabel ${label} entfernen`, title: "Kabel entfernen" }, "×");
+			remove.addEventListener("click", () => this.#remove(item));
+			const swatch = h("i", { class: `swatch ${def(item.from[0]).outputs[item.from[1]].kind}` });
+			const row = h("div", { class: index === active ? "row active" : "row" }, swatch, h("span", {}, label), remove);
+			const choose = () => {
+				if (box.active === index) return;
+				box.active = index;
 				this.draw();
-			});
-			const row = h("div", { class: "row" }, h("span", {}, `${source} → ${def(item.to[0]).name} ${target}`), remove);
+			};
+			row.addEventListener("pointerenter", choose);
+			row.addEventListener("click", choose);
 			if (!item.tap) return row;
 			const depth = h("input", { type: "range", min: "-1", max: "1", step: "0.01", "aria-label": "Stärke und Richtung" });
 			depth.value = item.depth;
 			depth.addEventListener("input", () => this.rack.setDepth(item, Number(depth.value)));
 			return h("div", {}, row, h("label", {}, "Stärke und Richtung", depth));
 		});
+		if (jack) {
+			const of = def(jack.id);
+			rows.unshift(h("b", {}, `Kabel an ${of.name} ${(jack.dir === "out" ? of.outputs : of.inputs)[jack.port].name}`));
+			if (!items.length) rows.push(h("span", {}, "Hier steckt kein Kabel."));
+		}
 		this.popover.replaceChildren(...rows);
-		this.popover.style.left = `${Math.max(4, x - 110)}px`;
+		this.popover.style.left = `${Math.max(4, x - 125)}px`;
 		this.popover.style.top = `${y + 16}px`;
 	}
 

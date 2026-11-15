@@ -294,6 +294,75 @@ try {
 		await page.setViewportSize({ width: 1500, height: 900 });
 	}
 
+	// Long press on a jack: the list of its cables, with selection, keys and a delete button.
+	{
+		await page.evaluate((patch) => window.faustRack.openPatch(patch), {
+			format: "faust-rack/1",
+			modules: [{ id: "lfo1", type: "lfo", params: {} }, { id: "vco1", type: "vco", params: {} }, { id: "output1", type: "output", params: {} }],
+			cables: [{ from: ["vco1", 0], to: ["output1", 0] }, { from: ["vco1", 1], to: ["output1", 0] }, { from: ["lfo1", 0], to: ["output1", 0] }, { from: ["vco1", 0], to: ["output1", 1] }],
+		});
+		await page.waitForTimeout(300);
+		const press = async (selector, ms) => {
+			await page.mouse.move(...(await center(selector)));
+			await page.mouse.down();
+			await page.waitForTimeout(ms);
+			await page.mouse.up();
+		};
+		const list = () =>
+			page.evaluate(() => {
+				const { view, rack } = window.faustRack;
+				const name = (c) => `${c.from.join(":")}>${c.to.join(":")}`;
+				return {
+					open: !document.querySelector(".popover").hidden,
+					title: document.querySelector(".popover b")?.textContent,
+					rows: [...document.querySelectorAll(".popover .row span")].map((el) => el.textContent),
+					colours: [...document.querySelectorAll(".popover .swatch")].map((el) => getComputedStyle(el).backgroundColor),
+					active: document.querySelector(".popover .row.active span")?.textContent,
+					lit: view.paths.filter((entry) => entry.el.classList.contains("selected")).map((entry) => name(entry.item)).join(" "),
+					litColour: getComputedStyle(document.querySelector(".cables .selected") ?? document.body).stroke,
+					cables: rack.cables.map(name).join(" "),
+				};
+			});
+		await press(jack("output1", "in", 0), 120);
+		check((await holding()) === 3 && !(await list()).open, "a short press on a jack still takes a cable into the hand and opens no list");
+		await page.keyboard.press("Escape");
+		await press(jack("output1", "in", 0), 650);
+		let now = await list();
+		check(now.open && (await holding()) === 0 && now.title === "Kabel an Output Mono" && now.rows.join(" | ") === "VCO Sinus | VCO Säge | LFO Sinus" && now.colours[0] === now.colours[1] && now.colours[2] !== now.colours[0], `a long press lists the jack's cables by their other end, coloured by kind: ${now.title}: ${now.rows.join(" | ")}`);
+		check(now.active === "VCO Sinus" && now.lit === "vco1:0>output1:0" && now.litColour === "rgb(255, 255, 255)", `the chosen entry's cable is highlighted in the rack: ${now.lit}`);
+		await page.hover(".popover .row >> nth=1");
+		now = await list();
+		check(now.active === "VCO Säge" && now.lit === "vco1:1>output1:0", `hovering an entry chooses it: ${now.lit}`);
+		await page.keyboard.press("ArrowDown");
+		const down = await list();
+		await page.keyboard.press("ArrowDown");
+		const wrapped = await list();
+		await page.keyboard.press("ArrowUp");
+		await page.keyboard.press("ArrowUp");
+		now = await list();
+		check(down.active === "LFO Sinus" && wrapped.active === "VCO Sinus" && now.active === "VCO Säge" && now.lit === "vco1:1>output1:0", "the arrow keys move the choice and wrap around");
+		await page.keyboard.press("Delete");
+		await page.waitForTimeout(500);
+		now = await list();
+		const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("faust-rack.patch")).cables.length);
+		check(now.open && now.rows.join(" | ") === "VCO Sinus | LFO Sinus" && now.cables === "vco1:0>output1:0 lfo1:0>output1:0 vco1:0>output1:1" && saved === 3, `Delete removes the chosen cable, the list stays open, the patch is saved: ${now.rows.join(" | ")}`);
+		await page.keyboard.press("Backspace");
+		now = await list();
+		check(now.open && now.rows.join(" | ") === "VCO Sinus" && now.cables === "vco1:0>output1:0 vco1:0>output1:1", `Backspace does the same: ${now.rows.join(" | ")} left`);
+		const button = await page.locator(".popover .row button").boundingBox();
+		await page.click(".popover .row button");
+		now = await list();
+		check(button.width >= 40 && button.height >= 40 && !now.open && now.cables === "vco1:0>output1:1", `each entry has a delete button of ${button.width}x${button.height} px, and the list closes with its last cable`);
+		await press(jack("vco1", "out", 0), 650);
+		now = await list();
+		await page.keyboard.press("Escape");
+		check(now.title === "Kabel an VCO Sinus" && now.rows.join() === "Output L" && !(await list()).open && (await list()).cables === "vco1:0>output1:1", "an output's list names the inputs it feeds, and Escape closes it without removing anything");
+		await press(jack("vco1", "out", 2), 650);
+		now = await list();
+		check(now.open && now.rows.length === 0, "a long press on a jack without cables says so");
+		await page.keyboard.press("Escape");
+	}
+
 	// Mute: the button in the module header silences everything the module sends, and the patch keeps it.
 	const muteButton = (id) => `.module[data-id="${id}"] .mute`;
 	const isMuted = (id) => page.evaluate((id) => ({ shown: document.querySelector(`.module[data-id="${id}"]`).classList.contains("muted"), stored: window.faustRack.rack.toJSON().modules.find((m) => m.id === id).muted === true }), id);
