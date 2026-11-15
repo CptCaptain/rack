@@ -1,0 +1,23 @@
+{
+  "name": "Vokal",
+  "group": "Effekte",
+  "color": "#c65ccf",
+  "columns": 2,
+  "description": "Vokalfilter: lässt einen Klang A, E, I, O oder U sagen. Mit einem LFO am CV spricht er.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "audio"
+    },
+    {
+      "name": "CV",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

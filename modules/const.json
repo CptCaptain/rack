@@ -1,0 +1,14 @@
+{
+  "name": "Wert",
+  "group": "Steuerung",
+  "color": "#b8b8c8",
+  "columns": 1,
+  "description": "Ein fester Wert zum Einstellen. Praktisch als Handregler für jeden CV-Eingang.",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "cv"
+    }
+  ]
+}

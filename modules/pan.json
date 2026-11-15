@@ -1,0 +1,27 @@
+{
+  "name": "Pan",
+  "group": "Formen und Mischen",
+  "color": "#8d99ae",
+  "columns": 1,
+  "description": "Legt einen Klang nach links oder rechts. Der CV-Eingang lässt ihn wandern.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "audio"
+    },
+    {
+      "name": "CV",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "L",
+      "kind": "audio"
+    },
+    {
+      "name": "R",
+      "kind": "audio"
+    }
+  ]
+}

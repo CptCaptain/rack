@@ -1,0 +1,23 @@
+{
+  "name": "Zufallsschleife",
+  "group": "Spielen und Takt",
+  "color": "#d96c5f",
+  "columns": 2,
+  "description": "Eine Schleife aus zufälligen Werten. Wandel bestimmt, wie schnell sie sich verändert: bei 0 wiederholt sie sich für immer.",
+  "inputs": [
+    {
+      "name": "Clock",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "CV",
+      "kind": "cv"
+    },
+    {
+      "name": "Gate",
+      "kind": "gate"
+    }
+  ]
+}

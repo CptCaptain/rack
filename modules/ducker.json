@@ -1,0 +1,23 @@
+{
+  "name": "Ducker",
+  "group": "Formen und Mischen",
+  "color": "#7b6cf6",
+  "columns": 2,
+  "description": "Sidechain: macht einen Klang leiser, sobald am Side-Eingang etwas laut wird. Mit der Kick am Side pumpt die Fläche.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "audio"
+    },
+    {
+      "name": "Side",
+      "kind": "audio"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "Ping Pong",
+  "group": "Effekte",
+  "color": "#3fa7a3",
+  "columns": 2,
+  "mono": true,
+  "description": "Stereo-Echo: die Wiederholungen springen zwischen links und rechts.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "audio"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "L",
+      "kind": "audio"
+    },
+    {
+      "name": "R",
+      "kind": "audio"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "Arp",
+  "group": "Spielen und Takt",
+  "color": "#f08a4b",
+  "columns": 2,
+  "description": "Arpeggiator: macht aus einem Ton einen gebrochenen Akkord. Jeder Clock-Impuls spielt den nächsten Ton.",
+  "inputs": [
+    {
+      "name": "V/Oct",
+      "kind": "cv"
+    },
+    {
+      "name": "Clock",
+      "kind": "gate"
+    },
+    {
+      "name": "Reset",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Pitch",
+      "kind": "cv"
+    },
+    {
+      "name": "Gate",
+      "kind": "gate"
+    }
+  ]
+}

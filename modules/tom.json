@@ -1,0 +1,19 @@
+{
+  "name": "Tom",
+  "group": "Schlagzeug",
+  "color": "#e07a4f",
+  "columns": 2,
+  "description": "Tom: eine gestimmte Trommel, höher als die Kick.",
+  "inputs": [
+    {
+      "name": "Trig",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

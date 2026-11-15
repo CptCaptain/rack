@@ -1,0 +1,19 @@
+{
+  "name": "Flanger",
+  "group": "Effekte",
+  "color": "#3fa7a3",
+  "columns": 2,
+  "description": "Flanger: ein Düsenjet-Schweif über dem Klang.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "audio"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

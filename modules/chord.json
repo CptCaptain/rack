@@ -1,0 +1,31 @@
+{
+  "name": "Akkord",
+  "group": "Steuerung",
+  "color": "#4ea8de",
+  "columns": 1,
+  "description": "Macht aus einer Tonhöhe vier: die Töne eines Akkords, für vier Oszillatoren.",
+  "inputs": [
+    {
+      "name": "V/Oct",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "1",
+      "kind": "cv"
+    },
+    {
+      "name": "2",
+      "kind": "cv"
+    },
+    {
+      "name": "3",
+      "kind": "cv"
+    },
+    {
+      "name": "4",
+      "kind": "cv"
+    }
+  ]
+}

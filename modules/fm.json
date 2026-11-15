@@ -1,0 +1,23 @@
+{
+  "name": "FM",
+  "group": "Klangquellen",
+  "color": "#f2c14e",
+  "columns": 2,
+  "description": "FM-Oszillator: ein Sinus verbiegt einen zweiten. Von weich bis metallisch, gut für Glocken und Bässe.",
+  "inputs": [
+    {
+      "name": "V/Oct",
+      "kind": "cv"
+    },
+    {
+      "name": "Index",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

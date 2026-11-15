@@ -1,0 +1,19 @@
+{
+  "name": "Slew",
+  "group": "Steuerung",
+  "color": "#5fb49c",
+  "columns": 2,
+  "description": "Glättet ein Steuersignal: Sprünge werden zu Rampen. Macht aus einem Gate eine einfache Hüllkurve.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "cv"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "name": "Logik",
+  "group": "Steuerung",
+  "color": "#8d99ae",
+  "columns": 1,
+  "description": "Verknüpft zwei Gates: beide an, eins an, genau eins an, und das Gegenteil von A.",
+  "inputs": [
+    {
+      "name": "A",
+      "kind": "gate"
+    },
+    {
+      "name": "B",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Und",
+      "kind": "gate"
+    },
+    {
+      "name": "Oder",
+      "kind": "gate"
+    },
+    {
+      "name": "Xor",
+      "kind": "gate"
+    },
+    {
+      "name": "Nicht A",
+      "kind": "gate"
+    }
+  ]
+}

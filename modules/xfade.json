@@ -1,0 +1,27 @@
+{
+  "name": "Blende",
+  "group": "Formen und Mischen",
+  "color": "#8d99ae",
+  "columns": 1,
+  "description": "Blendet zwischen zwei Signalen über, von Hand oder per CV.",
+  "inputs": [
+    {
+      "name": "A",
+      "kind": "audio"
+    },
+    {
+      "name": "B",
+      "kind": "audio"
+    },
+    {
+      "name": "CV",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

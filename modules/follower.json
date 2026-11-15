@@ -1,0 +1,23 @@
+{
+  "name": "Follower",
+  "group": "Steuerung",
+  "color": "#4ea8de",
+  "columns": 2,
+  "description": "Hüllkurvenfolger: macht aus der Lautstärke eines Klangs ein Steuersignal und ein Gate.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "audio"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Env",
+      "kind": "cv"
+    },
+    {
+      "name": "Gate",
+      "kind": "gate"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "Fold",
+  "group": "Effekte",
+  "color": "#d1495b",
+  "columns": 2,
+  "description": "Wavefolder: faltet die Welle auf sich selbst zurück. Macht aus einem Sinus etwas Helles, Schillerndes.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "audio"
+    },
+    {
+      "name": "CV",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

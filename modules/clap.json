@@ -1,0 +1,19 @@
+{
+  "name": "Clap",
+  "group": "Schlagzeug",
+  "color": "#e8c04a",
+  "columns": 2,
+  "description": "Händeklatschen: drei kurze Rauschstöße dicht hintereinander.",
+  "inputs": [
+    {
+      "name": "Trig",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}
