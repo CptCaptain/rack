@@ -6,7 +6,9 @@ The site is static files. There is no bundler and no backend. The interface is i
 
 ## What it does
 
-- 32 modules: oscillators, filter, envelopes, sequencers, drums, effects, a quantizer, and a small evolving world as a signal source.
+- 34 modules: oscillators, filter, envelopes, sequencers, a drum grid, drums, effects, a quantizer, and a small evolving world as a signal source.
+- Four-voice polyphony that spreads along the cables: play chords on the Poly Keyboard and every module behind it runs once per voice.
+- Undo, named patches, a share link that carries the patch, and recording to WAV.
 - Patch by dragging from jack to jack, or tap one jack and then the other. Drop a cable on a knob to modulate it.
 - A rack that is open in a browser picks up new and changed modules within seconds, without a reload.
 - Web MIDI: play the keyboard and pad modules, bind hardware knobs to rack knobs, send notes to a synth.

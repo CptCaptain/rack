@@ -57,6 +57,8 @@ Trage danach `"ringmod"` in `modules/index.json` ein.
 | `speakers` | nein | `true` schickt die zwei Ausgänge des Moduls an die Lautsprecher. `outputs` entfällt dann. |
 | `microphone` | nein | `true` speist die zwei Eingänge des Moduls aus dem Audio-Eingang des Rechners. `inputs` entfällt dann. |
 | `display` | nein | Die Live-Anzeige im Modul. Vorgabe ist `"scope"`: der erste Audio-Ausgang als Welle, sonst der erste Ausgang als Verlauf der letzten drei Sekunden. `"adsr"` zeichnet die Hüllkurve mit laufendem Punkt und braucht die Regler Attack, Decay, Sustain, Release. `"filter"` zeichnet die Filterkurve und braucht Cutoff, Resonanz, CV-Anteil. `"none"` zeigt nichts. |
+| `voices` | nein | `4` macht das Modul von sich aus vierstimmig. `process` hat dann jede Buchse viermal, Stimme für Stimme, die JSON-Datei nennt sie einmal. `modules/polykeys.dsp` zeigt es. |
+| `mono` | nein | `true` hält das Modul einstimmig, auch hinter einem mehrstimmigen Modul. Die Stimmen addieren sich dann am Eingang. Sinnvoll für Hall und Echo. |
 | `widget` | nein | Zusätzliches Bedienfeld: `"keyboard"`, `"pads"`, `"midiout"` oder `"life"`. |
 
 Eine Buchse hat `name` und `kind`. `kind` ist `audio`, `cv` oder `gate` und bestimmt nur die Farbe. Jede Buchse lässt sich mit jeder verbinden.
@@ -105,6 +107,10 @@ Mehrere Kabel in einem Eingang addieren sich. Ein offener Eingang liefert 0, als
 - Ein Kabel, das einen Kreis schließt, verzögert das Rack um 128 Samples. Rückkopplung innerhalb eines Moduls ist samplegenau.
 - Ein Regler, den kein Signal benutzt, verschwindet beim Kompilieren. `modules/midiout.dsp` zeigt, wie `attach` ihn behält.
 
+## Mehrstimmigkeit
+
+Ein Modul hinter einem mehrstimmigen Modul läuft von selbst einmal je Stimme. Dafür braucht es mindestens einen Eingang und darf weder Bargraph noch Widget haben. Die Stimmen teilen sich die Regler. Ein Kabel verbindet Stimme mit Stimme. Eine einzelne Stimme speist alle vier, und vier Stimmen addieren sich, wo ein Modul nur eine hat.
+
 ## Widgets
 
 Ein Widget ist JavaScript in `src/` und verbindet versteckte Regler eines Moduls mit der Außenwelt. Es findet die Regler über ihr Label.
@@ -115,6 +121,8 @@ Ein Widget ist JavaScript in `src/` und verbindet versteckte Regler eines Moduls
 | `pads` | versteckte Taster `pad1` bis `pad8` | acht Schlagflächen, Tasten 1 bis 8, MIDI-Noten auf Kanal 10 |
 | `midiout` | versteckte Bargraphs `note` und `gate`, Regler `Kanal` | schickt MIDI-Noten an alle MIDI-Ausgänge |
 | `life` | die versteckten Regler und Bargraphs aus `modules/life.dsp` | rechnet und zeichnet die Welt des Moduls Leben |
+| `grid` | versteckte Zahlen `t1`, `t2`, … (Bit n ist Schritt n) und Bargraph `step` | Raster mit 16 Schritten je Zahl |
+| `steps` | versteckte Zahlen `rests` und `holds` | ein Knopf je Sequencer-Schritt: spielen, Pause, halten |
 
 Ein neues Widget braucht eine Datei in `src/`, einen Eintrag in `WIDGETS` in `src/ui.js` und einen Build.
 
