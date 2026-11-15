@@ -15,5 +15,6 @@
       "kind": "cv"
     }
   ],
-  "group": "Steuerung"
+  "group": "Steuerung",
+  "display": "adsr"
 }

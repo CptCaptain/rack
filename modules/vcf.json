@@ -19,5 +19,6 @@
       "kind": "audio"
     }
   ],
-  "group": "Formen und Mischen"
+  "group": "Formen und Mischen",
+  "display": "filter"
 }

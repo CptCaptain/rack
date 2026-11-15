@@ -242,6 +242,58 @@ try {
 	await page.evaluate((patch) => window.faustRack.openPatch(patch), stored);
 	check((await mods()) === stillMod, "a patch with a modulation loads again");
 
+	// Live displays, on the first patch: clock, sequencer, VCO, ADSR, VCF, VCA, delay, output.
+	{
+		await page.evaluate((patch) => window.faustRack.openPatch(patch), first);
+		await page.waitForTimeout(500);
+		const watch = (ms) =>
+			page.evaluate(async (ms) => {
+				const { view } = window.faustRack;
+				const lit = (id, dir, port) => Number(document.querySelector(`.jack[data-module="${id}"][data-dir="${dir}"][data-port="${port}"] i`).style.getPropertyValue("--lit") || 0);
+				const seen = { clockOut: new Set(), seqClockIn: new Set(), vcoOut: new Set(), phases: new Set(), cutoffs: [] };
+				const [frames, spent, start] = [view.displays.frames, view.displays.spentMs, performance.now()];
+				while (performance.now() - start < ms) {
+					seen.clockOut.add(lit("clock1", "out", 1));
+					seen.seqClockIn.add(lit("seq1", "in", 0));
+					seen.vcoOut.add(lit("vco1", "out", 1));
+					seen.phases.add(view.displays.states.get("adsr1").phase);
+					seen.cutoffs.push(view.displays.states.get("vcf1").cutoff);
+					await new Promise((r) => setTimeout(r, 15));
+				}
+				const count = view.displays.frames - frames;
+				const drawn = (id) => view.displays.items.get(id).drawn;
+				return { fps: (count / ms) * 1000, msPerFrame: (view.displays.spentMs - spent) / count, clockOut: [...seen.clockOut], seqClockIn: [...seen.seqClockIn], vcoOut: Math.min(...seen.vcoOut), phases: [...seen.phases].sort(), cutoffLow: Math.min(...seen.cutoffs), cutoffHigh: Math.max(...seen.cutoffs), vcoLevel: view.displays.states.get("vco1").level, drawnFirst: drawn("clock1"), drawnLast: drawn("output1") };
+			}, ms);
+		const rows = (id) =>
+			page.evaluate((id) => {
+				// Reads a copy: reading the display itself over and over makes Chromium warn and slows the display.
+				const canvas = document.querySelector(`.module[data-id="${id}"] canvas.display`);
+				const copy = Object.assign(document.createElement("canvas"), { width: canvas.width, height: canvas.height }).getContext("2d", { willReadFrequently: true });
+				copy.drawImage(canvas, 0, 0);
+				const { data, width, height } = copy.getImageData(0, 0, canvas.width, canvas.height);
+				let rows = 0;
+				for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) if (data[(y * width + x) * 4] + data[(y * width + x) * 4 + 1] > 120) { rows++; break; }
+				return rows / height;
+			}, id);
+		const shown = await watch(2000);
+		check(shown.fps > 12 && shown.fps <= 34, `one loop draws all displays at ${shown.fps.toFixed(1)} frames a second, ${shown.msPerFrame.toFixed(2)} ms of work per frame for 8 modules`);
+		check(shown.clockOut.includes(0) && shown.clockOut.includes(1) && shown.seqClockIn.includes(0) && shown.seqClockIn.includes(1), `gate jacks blink, the clock's output and the sequencer's input alike (${shown.clockOut.join("/")} and ${shown.seqClockIn.join("/")})`);
+		check(shown.vcoOut > 0.9 && (await rows("vco1")) > 0.5, `a sounding output glows and the VCO draws its wave over ${Math.round((await rows("vco1")) * 100)} % of the display's height`);
+		check(shown.phases.length >= 3 && shown.phases.includes("release"), `the ADSR display's dot walks the envelope: ${shown.phases.join(", ")}`);
+		check(shown.cutoffHigh > shown.cutoffLow * 2, `the filter display's cutoff line moves with the envelope: ${Math.round(shown.cutoffLow)} to ${Math.round(shown.cutoffHigh)} Hz`);
+		await page.click('.module[data-id="vco1"] .mute');
+		await page.waitForTimeout(300);
+		const mutedLook = await watch(300);
+		check(mutedLook.vcoOut === 0 && mutedLook.vcoLevel === 0 && (await rows("vco1")) < 0.2, "a muted module's jacks go dark and its display goes flat and dim");
+		await page.click('.module[data-id="vco1"] .mute');
+		await page.setViewportSize({ width: 390, height: 700 });
+		await page.evaluate(() => document.getElementById("rack").scrollTo(0, 0));
+		await page.waitForTimeout(400);
+		const [a, b] = [await watch(50), await watch(800)];
+		check(b.drawnFirst > a.drawnFirst + 5 && b.drawnLast === a.drawnLast, `on a phone a module off screen is not drawn (${b.drawnLast - a.drawnLast} frames) while a visible one is (${b.drawnFirst - a.drawnFirst})`);
+		await page.setViewportSize({ width: 1500, height: 900 });
+	}
+
 	// Mute: the button in the module header silences everything the module sends, and the patch keeps it.
 	const muteButton = (id) => `.module[data-id="${id}"] .mute`;
 	const isMuted = (id) => page.evaluate((id) => ({ shown: document.querySelector(`.module[data-id="${id}"]`).classList.contains("muted"), stored: window.faustRack.rack.toJSON().modules.find((m) => m.id === id).muted === true }), id);

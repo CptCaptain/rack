@@ -54,6 +54,7 @@ Web MIDI und der Audio-Eingang brauchen Chrome oder Edge und HTTPS oder `localho
 | `src/rack.js` | Audio-Graph und Patch-Zustand, ohne DOM. |
 | `src/ui.js` | Module, Regler und Kabel im DOM. |
 | `src/controls.js` | Rechnet Reglerstellung in Werte um, auch für MIDI. |
+| `src/displays.js` | Live-Anzeigen: Bild im Modul und Licht in jeder Buchse, eine Schleife für alle. |
 | `src/keyboard.js`, `src/pads.js` | Klaviatur und Schlagflächen: Bildschirm, Computertasten, MIDI. |
 | `src/midi.js`, `src/midiout.js` | Web MIDI: Eingänge lesen, Noten senden. |
 | `src/main.js` | Start, Menüs, Speichern, Abgleich mit `modules/`. |

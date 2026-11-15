@@ -56,6 +56,7 @@ Trage danach `"ringmod"` in `modules/index.json` ein.
 | `columns` | nein | Regler pro Zeile. Vorgabe ist 2. |
 | `speakers` | nein | `true` schickt die zwei Ausgänge des Moduls an die Lautsprecher. `outputs` entfällt dann. |
 | `microphone` | nein | `true` speist die zwei Eingänge des Moduls aus dem Audio-Eingang des Rechners. `inputs` entfällt dann. |
+| `display` | nein | Die Live-Anzeige im Modul. Vorgabe ist `"scope"`: der erste Audio-Ausgang als Welle, sonst der erste Ausgang als Verlauf der letzten drei Sekunden. `"adsr"` zeichnet die Hüllkurve mit laufendem Punkt und braucht die Regler Attack, Decay, Sustain, Release. `"filter"` zeichnet die Filterkurve und braucht Cutoff, Resonanz, CV-Anteil. `"none"` zeigt nichts. |
 | `widget` | nein | Zusätzliches Bedienfeld: `"keyboard"`, `"pads"`, `"midiout"` oder `"life"`. |
 
 Eine Buchse hat `name` und `kind`. `kind` ist `audio`, `cv` oder `gate` und bestimmt nur die Farbe. Jede Buchse lässt sich mit jeder verbinden.

@@ -108,6 +108,14 @@ export class Rack {
 		}
 		if (def.speakers) mute.connect(this.analyser);
 		node.connect(this.sink);
+		// One analyser per output for the live displays (displays.js), behind the mute so a muted
+		// module shows nothing. They are native nodes: the displays add no code to the audio thread.
+		const tap = (source, port) => {
+			const analyser = new AnalyserNode(this.ctx, { fftSize: 1024 });
+			source.connect(analyser, port);
+			return analyser;
+		};
+		inst.taps = def.speakers ? [tap(mute, 0)] : def.outputs.map((_, port) => tap(inst.splitter, port));
 		node.setOutputParamHandler((address, value) => this.onOutput(id, address, value));
 		return inst;
 	}

@@ -110,3 +110,6 @@ select { font: inherit; font-size: 11px; color: inherit; background: #111216; bo
 .module.muted > :not(header) { opacity: 0.3; }
 .module.muted header b { color: var(--dim); text-decoration: line-through; }
 .cables .muted { opacity: 0.2; }
+.display { display: block; width: calc(100% - 16px); height: 40px; margin: 0 8px 4px; border-radius: 6px; background: #0d0e11; }
+.jack i { position: relative; }
+.jack i::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; background: var(--kind); opacity: var(--lit, 0); }

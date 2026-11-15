@@ -36,5 +36,6 @@
       "name": "Gen",
       "kind": "cv"
     }
-  ]
+  ],
+  "display": "none"
 }

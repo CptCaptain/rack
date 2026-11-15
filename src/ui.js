@@ -1,4 +1,5 @@
 import { clamp, travel } from "./controls.js";
+import { Displays } from "./displays.js";
 import { keyboard } from "./keyboard.js";
 import { life } from "./life.js";
 import { midiout } from "./midiout.js";
@@ -133,6 +134,7 @@ export class RackView {
 		this.modulesEl = h("div", { class: "modules" });
 		this.svg = document.createElementNS(SVG, "svg");
 		this.svg.setAttribute("class", "cables");
+		this.displays = new Displays(rack, root);
 		this.popover = h("div", { class: "popover", hidden: "" });
 		root.replaceChildren(this.modulesEl, this.svg, this.popover);
 		this.outputs = new Map();
@@ -205,6 +207,7 @@ export class RackView {
 		this.box = null;
 		this.root.classList.toggle("learning", this.learning);
 		this.modulesEl.replaceChildren(...[...this.rack.modules.values()].map((inst) => this.#panel(inst)));
+		this.displays.reset(this.modulesEl.children);
 		this.draw();
 	}
 
@@ -263,6 +266,7 @@ export class RackView {
 			"section",
 			{ class: inst.muted ? "module muted" : "module", "data-id": id, style: `--color:${def.color};--cols:${def.columns}` },
 			h("header", { title: def.description }, h("b", {}, def.name), mute, mover("‹", "nach vorn", -1), mover("›", "nach hinten", 1), close),
+			...(def.display === "none" || !inst.taps.length ? [] : [h("canvas", { class: "display" })]),
 			h("div", { class: "controls" }, ...controls),
 			...(widget ? [widget] : []),
 			h("footer", {}, h("div", { class: "jacks in" }, ...def.inputs.map(jack("in"))), h("div", { class: "jacks out" }, ...def.outputs.map(jack("out")))),

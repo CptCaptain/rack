@@ -24,6 +24,9 @@ function draw(canvas, { world, env }) {
 		g.arc(c.x * SCALE, c.y * SCALE, 2 + c.energy, 0, 2 * Math.PI);
 		g.fill();
 	}
+	g.fillStyle = "#e8e9ee";
+	g.font = "11px system-ui, sans-serif";
+	g.fillText(`${world.creatures.length} Wesen`, 6, 14);
 }
 
 // Module widget "life": runs and draws the world, and turns births and deaths into signals.

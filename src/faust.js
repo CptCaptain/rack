@@ -74,6 +74,7 @@ export async function compile(compiler, id, info, code) {
 		color: String(info.color ?? "#888"),
 		columns: Number(info.columns) || 2,
 		widget: info.widget ?? null,
+		display: String(info.display ?? "scope"),
 		speakers,
 		microphone,
 		inputs: parsePorts(id, microphone ? [] : info.inputs, microphone ? 0 : dsp.inputs, "Eingänge"),
