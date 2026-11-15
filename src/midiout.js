@@ -16,7 +16,7 @@ export function midiout(def, io) {
 	let note = 60;
 	io.onOutput("note", (value) => (note = Math.round(value)));
 	io.onOutput("gate", (value) => {
-		if (value <= 0.5) return releaseMidiOut(io.id);
+		if (value <= 0.5 || io.muted()) return releaseMidiOut(io.id);
 		if (sounding.has(io.id)) return;
 		const channel = io.value("Kanal") - 1;
 		sounding.set(io.id, [channel, note]);

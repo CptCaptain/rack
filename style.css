@@ -105,3 +105,8 @@ select { font: inherit; font-size: 11px; color: inherit; background: #111216; bo
 .banner[hidden] { display: none; }
 .banner span { flex: 1; }
 .life { display: block; width: 300px; max-width: calc(100% - 16px); margin: 0 8px; border-radius: 6px; background: #0d0e11; }
+.module .mute { min-width: 40px; min-height: 40px; margin: 2px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; color: var(--dim); font-weight: 700; }
+.module .mute[aria-pressed="true"] { background: var(--gate); border-color: var(--gate); color: #fff; }
+.module.muted > :not(header) { opacity: 0.3; }
+.module.muted header b { color: var(--dim); text-decoration: line-through; }
+.cables .muted { opacity: 0.2; }

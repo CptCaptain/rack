@@ -4,7 +4,7 @@ import { life } from "./life.js";
 import { midiout } from "./midiout.js";
 import { pads } from "./pads.js";
 
-// A widget gets the module definition and { id, poke, value, onOutput }, all keyed by control label.
+// A widget gets the module definition and { id, poke, value, onOutput, muted }, the first three keyed by control label.
 const WIDGETS = { keyboard, pads, midiout, life };
 const SVG = "http://www.w3.org/2000/svg";
 // While a cable is dragged this close to the rack's edge, the rack scrolls.
@@ -223,6 +223,14 @@ export class RackView {
 			this.rack.remove(id);
 			this.render();
 		});
+		const mute = h("button", { class: "mute", title: "Modul stummschalten", "aria-label": `${def.name} stummschalten`, "aria-pressed": String(inst.muted) }, "M");
+		mute.addEventListener("click", () => {
+			const muted = !this.rack.modules.get(id).muted;
+			this.rack.setMuted(id, muted);
+			mute.setAttribute("aria-pressed", String(muted));
+			mute.closest(".module").classList.toggle("muted", muted);
+			this.draw();
+		});
 		const mover = (label, title, delta) => {
 			const button = h("button", { class: "move", title, "aria-label": `${def.name} ${title}` }, label);
 			button.addEventListener("click", () => {
@@ -247,13 +255,14 @@ export class RackView {
 			poke: (label, value) => this.rack.poke(id, address(label), value),
 			value: (label) => this.rack.modules.get(id).params[address(label)] ?? def.controls.find((c) => c.label === label).init,
 			onOutput: (label, fn) => this.outputs.set(`${id} ${address(label)}`, fn),
+			muted: () => this.rack.modules.get(id).muted,
 		});
 		const jack = (dir) => (port, index) =>
 			h("div", { class: `jack ${port.kind}`, "data-module": id, "data-dir": dir, "data-port": index }, h("i"), h("span", {}, port.name));
 		return h(
 			"section",
-			{ class: "module", "data-id": id, style: `--color:${def.color};--cols:${def.columns}` },
-			h("header", { title: def.description }, h("b", {}, def.name), mover("‹", "nach vorn", -1), mover("›", "nach hinten", 1), close),
+			{ class: inst.muted ? "module muted" : "module", "data-id": id, style: `--color:${def.color};--cols:${def.columns}` },
+			h("header", { title: def.description }, h("b", {}, def.name), mute, mover("‹", "nach vorn", -1), mover("›", "nach hinten", 1), close),
 			h("div", { class: "controls" }, ...controls),
 			...(widget ? [widget] : []),
 			h("footer", {}, h("div", { class: "jacks in" }, ...def.inputs.map(jack("in"))), h("div", { class: "jacks out" }, ...def.outputs.map(jack("out")))),
@@ -294,9 +303,10 @@ export class RackView {
 		};
 		const kindOf = ([id, port]) => this.rack.modules.get(id).def.outputs[port].kind;
 		const start = ([id, port]) => this.#center({ id, dir: "out", port });
+		const kindOfLive = (from) => (this.rack.modules.get(from[0]).muted ? `${kindOf(from)} muted` : kindOf(from));
 		this.paths = [
-			...this.rack.cables.map((cable) => ({ item: cable, el: path(start(cable.from), this.#center({ id: cable.to[0], dir: "in", port: cable.to[1] }), kindOf(cable.from)) })),
-			...this.rack.mods.map((mod) => ({ item: mod, el: path(start(mod.from), this.#centerOf(this.#controlEl(mod.to).firstChild), `${kindOf(mod.from)} mod`) })),
+			...this.rack.cables.map((cable) => ({ item: cable, el: path(start(cable.from), this.#center({ id: cable.to[0], dir: "in", port: cable.to[1] }), kindOfLive(cable.from)) })),
+			...this.rack.mods.map((mod) => ({ item: mod, el: path(start(mod.from), this.#centerOf(this.#controlEl(mod.to).firstChild), `${kindOfLive(mod.from)} mod`) })),
 		];
 		if (this.box) {
 			this.box.items = this.box.items.filter((item) => this.paths.some((entry) => entry.item === item));

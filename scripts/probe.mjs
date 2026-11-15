@@ -106,6 +106,38 @@ for (const [name, data, pick, ok] of probes) {
 	if (!pass) failed++;
 	console.log(`${pass ? "ok  " : "FAIL"} ${name}: ${Number(value.toFixed(3))}${result.finite ? "" : " (non-finite samples)"}`);
 }
+// Mute: a sine at full level is muted half a second into an offline render. A hard cut would
+// jump by up to the full level between two samples; a fade must stay near the sine's own slope.
+const muteFade = await page.evaluate(async () => {
+	const { Rack } = await import("/src/rack.js");
+	const rate = 44100;
+	const ctx = new OfflineAudioContext(2, rate, rate);
+	const rack = new Rack(ctx, window.faustRack.library.defs);
+	await rack.load({
+		format: "faust-rack/1",
+		modules: [{ id: "vco1", type: "vco", params: {} }, { id: "output1", type: "output", params: { "/output/Volume": 1, "/output/Limiter": 0 } }],
+		cables: [{ from: ["vco1", 0], to: ["output1", 0] }],
+	});
+	ctx.suspend(0.5).then(() => {
+		rack.setMuted("vco1", true);
+		ctx.resume();
+	});
+	const data = (await ctx.startRendering()).getChannelData(0);
+	const at = Math.round(0.5 * rate);
+	const jump = (from, to) => {
+		let max = 0;
+		for (let i = from + 1; i < to; i++) max = Math.max(max, Math.abs(data[i] - data[i - 1]));
+		return max;
+	};
+	let lastSound = at;
+	for (let i = at; i < data.length; i++) if (data[i] !== 0) lastSound = i;
+	const level = (from, to) => data.subarray(from, to).reduce((max, v) => Math.max(max, Math.abs(v)), 0);
+	return { before: level(at - 4410, at), fadeMs: ((lastSound - at) / rate) * 1000, jumpInFade: jump(at - 2, at + 2000), jumpOfSine: jump(at - 4410, at - 2), after: level(at + 2000, data.length) };
+});
+const fadeOk = muteFade.before > 0.9 && muteFade.fadeMs > 5 && muteFade.fadeMs < 20 && muteFade.jumpInFade < muteFade.jumpOfSine * 1.5 && muteFade.after === 0;
+if (!fadeOk) failed++;
+console.log(`${fadeOk ? "ok  " : "FAIL"} mute fades a full-level sine to exact silence in ${muteFade.fadeMs.toFixed(1)} ms without a step: largest jump ${muteFade.jumpInFade.toFixed(4)} per sample, the sine alone ${muteFade.jumpOfSine.toFixed(4)}`);
+
 // The Leben module's world, without sound: does selection work, and does it need mutation?
 const life = await page.evaluate(async () => {
 	const { World } = await import("/src/life-world.js");

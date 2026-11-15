@@ -242,6 +242,49 @@ try {
 	await page.evaluate((patch) => window.faustRack.openPatch(patch), stored);
 	check((await mods()) === stillMod, "a patch with a modulation loads again");
 
+	// Mute: the button in the module header silences everything the module sends, and the patch keeps it.
+	const muteButton = (id) => `.module[data-id="${id}"] .mute`;
+	const isMuted = (id) => page.evaluate((id) => ({ shown: document.querySelector(`.module[data-id="${id}"]`).classList.contains("muted"), stored: window.faustRack.rack.toJSON().modules.find((m) => m.id === id).muted === true }), id);
+	await page.evaluate((patch) => window.faustRack.openPatch(patch), {
+		format: "faust-rack/1",
+		modules: [{ id: "clock1", type: "clock", params: { "/clock/Tempo": 200 } }, { id: "kick1", type: "kick", params: {} }, { id: "vco1", type: "vco", params: {} }, { id: "output1", type: "output", params: {} }],
+		cables: [{ from: ["clock1", 0], to: ["kick1", 0] }, { from: ["vco1", 0], to: ["output1", 0] }],
+	});
+	await page.waitForTimeout(400);
+	const loud = await peak();
+	const size = await page.locator(muteButton("vco1")).boundingBox();
+	await page.click(muteButton("vco1"));
+	await page.waitForTimeout(200);
+	const quiet = await peak();
+	const muteState = await isMuted("vco1");
+	const dimmed = await page.evaluate(() => getComputedStyle(document.querySelector('.module[data-id="vco1"] .controls')).opacity);
+	check(loud > 0.05 && quiet === 0 && muteState.shown && muteState.stored && Number(dimmed) < 0.5 && size.width >= 40 && size.height >= 40, `mute silences a module: peak ${loud.toFixed(3)} then ${quiet}, button ${size.width}x${size.height} px, panel opacity ${dimmed}`);
+	await page.click(muteButton("vco1"));
+	await page.waitForTimeout(200);
+	check((await peak()) > 0.05 && !(await isMuted("vco1")).shown && !(await isMuted("vco1")).stored, "a second press brings it back");
+
+	// Gates are muted too: a muted clock stops triggering the kick.
+	await page.click(muteButton("vco1"));
+	await page.evaluate(() => window.faustRack.rack.connect(["kick1", 0], ["output1", 0]));
+	await page.waitForTimeout(300);
+	const kicking = await peak();
+	await page.click(muteButton("clock1"));
+	await page.waitForTimeout(1500);
+	const stopped = await peak();
+	check(kicking > 0.05 && stopped < 0.001, `a muted clock sends no gates: kick peak ${kicking.toFixed(3)} then ${stopped.toFixed(4)}`);
+	await page.click(muteButton("clock1"));
+	await page.waitForTimeout(700);
+	await page.reload();
+	await page.click("#start");
+	await page.waitForFunction(() => window.faustRack?.rack.modules.size, null, { timeout: 60_000 });
+	await page.click("#btn-midi");
+	await page.waitForTimeout(400);
+	const kept = { vco: await isMuted("vco1"), clock: await isMuted("clock1"), pressed: await page.getAttribute(muteButton("vco1"), "aria-pressed") };
+	const kickOnly = await peak();
+	await page.click(muteButton("kick1"));
+	await page.waitForTimeout(200);
+	check(kept.vco.shown && kept.vco.stored && !kept.clock.shown && kept.pressed === "true" && kickOnly > 0.05 && (await peak()) === 0, `the mute state survives a reload: vco1 still muted, clock1 not, only the kick sounds (${kickOnly.toFixed(3)})`);
+
 	const tastatur = JSON.parse(readFileSync(`${dir}/patches/tastatur.json`, "utf8"));
 	const param = (id, address) => page.evaluate(([id, address]) => window.faustRack.rack.modules.get(id).params[address], [id, address]);
 	await page.click("#btn-midi");
@@ -294,6 +337,14 @@ try {
 	const cycle = [60, 64, 67];
 	const inOrder = ons.every((note, i) => cycle.includes(note) && (i === 0 || note === cycle[(cycle.indexOf(ons[i - 1]) + 1) % 3]));
 	check(ons.length >= 7 && ons.length <= 9 && inOrder && Math.abs(ons.length - offs.length) <= 1, `MIDI Out sends the sequence in order on channel 2, notes ${ons.join(" ")}`);
+	await page.click('.module[data-id="midiout1"] .mute');
+	await page.waitForTimeout(300);
+	await page.evaluate(() => (window.midiSent.length = 0));
+	await page.waitForTimeout(1000);
+	const whileMuted = await page.evaluate(() => window.midiSent.filter((m) => m.startsWith("145 ")).length);
+	check(whileMuted === 0, "a muted MIDI Out sends no notes");
+	await page.click('.module[data-id="midiout1"] .mute');
+	await page.waitForTimeout(600);
 	await page.evaluate(() => (window.midiSent.length = 0));
 	await page.click('.module[data-id="midiout1"] .close');
 	const after = await page.evaluate(() => window.midiSent);

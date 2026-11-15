@@ -1,6 +1,8 @@
 import { clamp, travel } from "./controls.js";
 
 export const FORMAT = "faust-rack/1";
+// Muting fades over this long, so cutting a sounding module does not click.
+const MUTE_FADE_SECONDS = 0.01;
 
 const isRef = (ref) => Array.isArray(ref) && typeof ref[0] === "string" && Number.isInteger(ref[1]);
 
@@ -13,7 +15,7 @@ export function parsePatch(data, defs) {
 			throw new Error(`Ungültige oder doppelte Modul-ID: ${m?.id}`);
 		if (!defs.has(m.type)) throw new Error(`Unbekanntes Modul „${m.type}“`);
 		types.set(m.id, defs.get(m.type));
-		return { id: m.id, type: m.type, params: { ...m.params } };
+		return { id: m.id, type: m.type, params: { ...m.params }, muted: m.muted === true };
 	});
 	const cables = data.cables.map((c) => {
 		if (!isRef(c?.from) || !isRef(c?.to)) throw new Error("Kabel brauchen from und to als [Modul-ID, Buchsen-Nummer]");
@@ -87,7 +89,10 @@ export class Rack {
 	}
 
 	#wire(def, id, [node, external]) {
-		const inst = { id, def, node, external, params: {}, merger: null, splitter: null };
+		// Everything a module sends out passes its mute gain: cables, modulations and the speakers.
+		const mute = new GainNode(this.ctx, { channelCount: Math.max(1, def.speakers ? 2 : def.outputs.length), channelCountMode: "explicit", channelInterpretation: "discrete" });
+		const inst = { id, def, node, external, mute, muted: false, params: {}, merger: null, splitter: null };
+		node.connect(mute);
 		const inputs = external ? 2 : def.inputs.length;
 		if (inputs) {
 			inst.merger = new ChannelMergerNode(this.ctx, { numberOfInputs: inputs });
@@ -99,15 +104,17 @@ export class Rack {
 		}
 		if (def.outputs.length) {
 			inst.splitter = new ChannelSplitterNode(this.ctx, { numberOfOutputs: def.outputs.length });
-			node.connect(inst.splitter);
+			mute.connect(inst.splitter);
 		}
-		node.connect(def.speakers ? this.analyser : this.sink);
+		if (def.speakers) mute.connect(this.analyser);
+		node.connect(this.sink);
 		node.setOutputParamHandler((address, value) => this.onOutput(id, address, value));
 		return inst;
 	}
 
 	#unwire(inst) {
 		inst.node.disconnect();
+		inst.mute.disconnect();
 		inst.splitter?.disconnect();
 		if (inst.merger) {
 			this.silence.disconnect(inst.merger);
@@ -117,13 +124,14 @@ export class Rack {
 		inst.node.destroy();
 	}
 
-	async add(type, { id, params = {} } = {}) {
+	async add(type, { id, params = {}, muted = false } = {}) {
 		const def = this.defs.get(type);
 		if (!def) throw new Error(`Unbekanntes Modul „${type}“`);
 		const node = await this.#node(def);
 		if (id === undefined) for (let n = 1; this.modules.has((id = `${type}${n}`)); n++);
 		if (this.modules.has(id)) throw new Error(`Modul-ID „${id}“ gibt es schon`);
 		this.modules.set(id, this.#wire(def, id, node));
+		if (muted) this.setMuted(id, true, 0);
 		for (const [address, value] of Object.entries(params)) this.setParam(id, address, value);
 		this.onChange();
 		return this.modules.get(id);
@@ -138,6 +146,18 @@ export class Rack {
 		this.#unwire(inst);
 		this.modules.delete(id);
 		this.onRemove(id);
+		this.onChange();
+	}
+
+	// A muted module keeps running but sends nothing out of any jack: no sound, no CV, no gate.
+	setMuted(id, muted, fade = MUTE_FADE_SECONDS) {
+		const inst = this.modules.get(id);
+		const gain = inst.mute.gain;
+		const now = this.ctx.currentTime;
+		inst.muted = muted;
+		gain.cancelScheduledValues(now);
+		gain.setValueAtTime(fade ? gain.value : Number(!muted), now);
+		gain.linearRampToValueAtTime(Number(!muted), now + fade);
 		this.onChange();
 	}
 
@@ -167,6 +187,7 @@ export class Rack {
 			for (const mod of mods) this.unmodulate(mod);
 			this.#unwire(old);
 			this.modules.set(old.id, this.#wire(def, old.id, node));
+			if (old.muted) this.setMuted(old.id, true, 0);
 			for (const [address, value] of Object.entries(old.params))
 				if (def.controls.some((c) => c.address === address)) this.setParam(old.id, address, value);
 			for (const { from, to } of cables)
@@ -330,7 +351,7 @@ export class Rack {
 	toJSON() {
 		return {
 			format: FORMAT,
-			modules: [...this.modules.values()].map(({ id, def, params }) => ({ id, type: def.id, params })),
+			modules: [...this.modules.values()].map(({ id, def, params, muted }) => ({ id, type: def.id, params, ...(muted && { muted }) })),
 			cables: this.cables.map(({ from, to }) => ({ from, to })),
 			midi: [...this.midi].map(([cc, { id, address }]) => ({ cc, module: id, address })),
 			mods: this.mods.map(({ from, to, depth }) => ({ from, to, depth })),

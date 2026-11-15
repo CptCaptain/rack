@@ -132,6 +132,8 @@ Ein Patch ist eine JSON-Datei. Beispiele liegen in `patches/`, `patches/index.js
 }
 ```
 
+Ein Modul mit `"muted": true` ist stummgeschaltet: Es läuft, gibt aber an keiner Buchse etwas aus.
+
 Optional kommt `"midi": [{ "cc": 74, "module": "vcf1", "address": "/vcf/Cutoff" }]` dazu. Jeder Eintrag bindet einen MIDI-Controller an einen Regler.
 
 Optional kommt `"mods": [{ "from": ["lfo1", 0], "to": ["delay1", "/delay/Zeit"], "depth": 0.25 }]` dazu. Jeder Eintrag lässt ein Signal einen Regler bewegen. `depth` liegt zwischen -1 und 1 und ist der Anteil des Reglerwegs, den ein Signal von 1 ausmacht. Die Seite stellt den Regler etwa 85-mal pro Sekunde nach. Für schnelle Hüllkurven ist ein CV-Eingang im Modul genauer.
