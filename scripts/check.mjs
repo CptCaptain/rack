@@ -249,6 +249,28 @@ try {
 	await page.evaluate((patch) => window.faustRack.openPatch(patch), stored);
 	check((await mods()) === stillMod, "a patch with a modulation loads again");
 
+	// Named patches and the share link.
+	{
+		await page.evaluate((patch) => window.faustRack.openPatch(patch), first);
+		await page.waitForTimeout(500);
+		page.once("dialog", (dialog) => dialog.accept("Mein Test"));
+		await page.click("#btn-patches");
+		await page.click('#picker button:has-text("Diesen Patch speichern")');
+		const link = await page.evaluate(() => window.faustRack.shareLink());
+		await page.evaluate(() => window.faustRack.openPatch({ format: "faust-rack/1", modules: [], cables: [] }));
+		await page.click("#btn-patches");
+		await page.click('#picker button:has-text("Mein Test")');
+		await page.waitForFunction((n) => window.faustRack.rack.modules.size === n, first.modules.length);
+		await page.evaluate(() => window.faustRack.openPatch({ format: "faust-rack/1", modules: [], cables: [] }));
+		await page.waitForTimeout(600);
+		await page.goto("about:blank");
+		await page.goto(link);
+		await page.click("#start");
+		await page.waitForFunction(() => window.faustRack?.rack.modules.size, null, { timeout: 60_000 });
+		const arrived = await page.evaluate(() => ({ cables: window.faustRack.rack.cables.length, hash: location.hash }));
+		check(arrived.cables === first.cables.length && arrived.hash === "", `a patch saved under a name loads again, and a share link of ${link.length} characters brings the patch into a rack that had saved an empty one`);
+	}
+
 	// Undo and redo. A module that stays is not rebuilt, so the sound goes on.
 	{
 		await page.evaluate((patch) => window.faustRack.openPatch(patch), first);

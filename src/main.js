@@ -10,12 +10,13 @@ import { MAX_RECORDING_MINUTES, startRecording } from "./record.js";
 import { RackView, h } from "./ui.js";
 
 const STORE = "faust-rack.patch";
+const LIBRARY = "faust-rack.patches";
 const POLL_MS = 3000;
 const $ = (id) => document.getElementById(id);
 
 let rack;
 let view;
-let library;
+let modules;
 
 // Undo: every saved state of the patch goes on a stack. Turning a knob saves once it rests.
 const history = { past: [], future: [], current: null, restoring: false };
@@ -76,10 +77,35 @@ const openPatch = (data) =>
 		}
 	});
 
+// Patches saved under a name, in this browser: { name: patch }.
+const library = {
+	all: () => JSON.parse(localStorage.getItem(LIBRARY) ?? "{}"),
+	set: (name, patch) => localStorage.setItem(LIBRARY, JSON.stringify({ ...library.all(), [name]: patch })),
+	remove: (name) => localStorage.setItem(LIBRARY, JSON.stringify(Object.fromEntries(Object.entries(library.all()).filter(([key]) => key !== name)))),
+};
+
+// A patch as a link: the JSON, compressed, in the part of the address after #. That part
+// never reaches the server.
+const base64url = { "+": "-", "/": "_", "-": "+", _: "/" };
+async function shareLink() {
+	const packed = new Blob([JSON.stringify(rack)]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+	const bytes = new Uint8Array(await new Response(packed).arrayBuffer());
+	const code = btoa(String.fromCharCode(...bytes)).replace(/[+/]/g, (c) => base64url[c]).replace(/=+$/, "");
+	return `${location.origin}${location.pathname}#p=${code}`;
+}
+
+async function sharedPatch() {
+	const code = location.hash.match(/^#p=(.+)/)?.[1];
+	if (!code) return null;
+	window.history.replaceState(null, "", location.pathname);
+	const bytes = Uint8Array.from(atob(code.replace(/[-_]/g, (c) => base64url[c])), (c) => c.charCodeAt(0));
+	return JSON.parse(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text());
+}
+
 function pick(title, items) {
 	const dialog = $("picker");
 	let lastGroup = "";
-	const entries = items.flatMap(({ name, description, color, group = "", run }) => {
+	const entries = items.flatMap(({ name, description, color, group = "", run, remove }) => {
 		const button = h("button", { style: `--color:${color ?? "transparent"}` }, h("b", {}, name), h("span", {}, description ?? ""));
 		button.addEventListener("click", () => {
 			dialog.close();
@@ -87,7 +113,13 @@ function pick(title, items) {
 		});
 		const heading = group === lastGroup ? [] : [h("h3", {}, group)];
 		lastGroup = group;
-		return [...heading, button];
+		if (!remove) return [...heading, button];
+		const erase = h("button", { class: "erase", "aria-label": `${name} löschen`, title: "Löschen" }, "×");
+		erase.addEventListener("click", () => {
+			remove();
+			erase.parentElement.remove();
+		});
+		return [...heading, h("div", { class: "entry" }, button, erase)];
 	});
 	dialog.replaceChildren(h("h2", {}, title), ...entries, h("form", { method: "dialog" }, h("button", {}, "Abbrechen")));
 	dialog.showModal();
@@ -101,7 +133,7 @@ function reportFailures(failed) {
 async function pollModules() {
 	if (document.visibilityState === "visible") {
 		try {
-			const { changed, failed } = await library.refresh();
+			const { changed, failed } = await modules.refresh();
 			reportFailures(failed);
 			if (changed.length) {
 				await serial(async () => {
@@ -174,8 +206,8 @@ function drawScope() {
 }
 
 const compiled = (async () => {
-	library = await ModuleLibrary.create();
-	const { failed } = await library.refresh((id, i, total) => {
+	modules = await ModuleLibrary.create();
+	const { failed } = await modules.refresh((id, i, total) => {
 		$("progress").textContent = `Kompiliere Modul ${i + 1} von ${total}: ${id}`;
 	});
 	$("progress").textContent = failed.length ? `${failed.length} Modul(e) mit Fehler, siehe Statuszeile.` : "Bereit.";
@@ -188,7 +220,7 @@ async function start() {
 	const failed = await compiled;
 	const ctx = new AudioContext({ latencyHint: "interactive" });
 	let saveTimer;
-	rack = new Rack(ctx, library.defs, {
+	rack = new Rack(ctx, modules.defs, {
 		onRemove: (id) => {
 			releaseMidiOut(id);
 			forgetWorld(id);
@@ -202,8 +234,9 @@ async function start() {
 	const examples = await fetchJson("patches/index.json");
 	const saved = localStorage.getItem(STORE);
 	try {
-		if (!saved) throw new Error("kein gespeicherter Patch");
-		await rack.load(JSON.parse(saved));
+		const shared = await sharedPatch().catch(() => null);
+		if (!shared && !saved) throw new Error("kein gespeicherter Patch");
+		await rack.load(shared ?? JSON.parse(saved));
 	} catch {
 		await rack.load(await fetchJson(`patches/${examples[0].file}`));
 	}
@@ -213,7 +246,7 @@ async function start() {
 	setTimeout(pollModules, POLL_MS);
 	// Once allowed, MIDI comes back on its own; the first time needs the button because the browser asks.
 	navigator.permissions?.query({ name: "midi" }).then((permission) => permission.state === "granted" && connectMidi(), () => {});
-	window.faustRack = { rack, view, library, openPatch, history };
+	window.faustRack = { rack, view, library: modules, openPatch, history, shareLink };
 	$("start").textContent = "Weiter";
 	$("bar").inert = false;
 }
@@ -225,7 +258,7 @@ $("help").showModal();
 
 $("btn-help").addEventListener("click", () => $("help").showModal());
 $("btn-add").addEventListener("click", () => {
-	const defs = [...library.defs.values()];
+	const defs = [...modules.defs.values()];
 	const groups = [...new Set(defs.map((def) => def.group))];
 	const add = (def) =>
 		serial(async () => {
@@ -240,9 +273,27 @@ $("btn-add").addEventListener("click", () => {
 });
 $("btn-patches").addEventListener("click", async () => {
 	const examples = await fetchJson("patches/index.json");
-	pick("Patch laden", [
-		...examples.map((ex) => ({ ...ex, run: async () => openPatch(await fetchJson(`patches/${ex.file}`)) })),
-		{ name: "Leeres Rack", description: "Alles entfernen und neu anfangen.", run: () => openPatch({ format: "faust-rack/1", modules: [], cables: [] }) },
+	const save = () => {
+		const name = prompt("Name für diesen Patch:")?.trim();
+		if (!name) return;
+		library.set(name, rack.toJSON());
+		say(`Gespeichert als „${name}“.`);
+	};
+	const share = async () => {
+		const link = await shareLink();
+		try {
+			await navigator.clipboard.writeText(link);
+			say("Link kopiert. Wer ihn öffnet, bekommt diesen Patch.");
+		} catch {
+			prompt("Link zum Kopieren:", link);
+		}
+	};
+	pick("Patches", [
+		{ name: "Diesen Patch speichern …", description: "Unter einem Namen, in diesem Browser.", run: save },
+		{ name: "Link zum Teilen kopieren", description: "Der Link enthält den ganzen Patch.", run: share },
+		...Object.entries(library.all()).map(([name, patch]) => ({ group: "Meine Patches", name, description: `${patch.modules.length} Module`, run: () => openPatch(patch), remove: () => library.remove(name) })),
+		...examples.map((ex) => ({ ...ex, group: "Beispiele", run: async () => openPatch(await fetchJson(`patches/${ex.file}`)) })),
+		{ group: "Beispiele", name: "Leeres Rack", description: "Alles entfernen und neu anfangen.", run: () => openPatch({ format: "faust-rack/1", modules: [], cables: [] }) },
 	]);
 });
 function download(blob, name) {
