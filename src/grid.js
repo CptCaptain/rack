@@ -38,7 +38,7 @@ export function grid(def, io) {
 export function steps(def, io) {
 	const el = document.createElement("div");
 	el.className = "steps";
-	const LOOK = [["●", "spielt"], ["–", "Pause"], ["⌒", "hält den Ton davor"]];
+	const LOOK = [["●", "spielt"], ["–", "Pause"], ["~", "hält den Ton davor"]];
 	for (let n = 0; n < 8; n++) {
 		const button = document.createElement("button");
 		const state = () => (bit(io.value("rests"), n) ? 1 : bit(io.value("holds"), n) ? 2 : 0);
