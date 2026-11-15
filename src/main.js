@@ -12,6 +12,7 @@ import { RackView, h } from "./ui.js";
 
 const STORE = "faust-rack.patch";
 const LIBRARY = "faust-rack.patches";
+const NAME = "faust-rack.name";
 const POLL_MS = 3000;
 const $ = (id) => document.getElementById(id);
 
@@ -69,14 +70,30 @@ const fetchJson = async (path) => {
 	return res.json();
 };
 
-const openPatch = (data) =>
+// The name the patch in the rack was saved under, or "" for one that has none yet.
+// Speichern writes to that name without asking.
+function namePatch(name) {
+	name ? localStorage.setItem(NAME, name) : localStorage.removeItem(NAME);
+	$("patch-name").textContent = name;
+}
+
+const openPatch = (data, name = "") =>
 	serial(async () => {
 		try {
 			await rack.load(data);
+			namePatch(name);
 		} finally {
 			view.render();
 		}
 	});
+
+function savePatch(name = localStorage.getItem(NAME)) {
+	name ||= prompt("Name für diesen Patch:")?.trim();
+	if (!name) return;
+	library.set(name, rack.toJSON());
+	namePatch(name);
+	say(`Gespeichert als „${name}“. Du findest ihn unter Patches.`);
+}
 
 // Patches saved under a name, in this browser: { name: patch }.
 const library = {
@@ -237,6 +254,7 @@ async function start() {
 	const saved = localStorage.getItem(STORE);
 	try {
 		const shared = await sharedPatch().catch(() => null);
+		namePatch(shared ? "" : (localStorage.getItem(NAME) ?? ""));
 		if (!shared && !saved) throw new Error("kein gespeicherter Patch");
 		await rack.load(shared ?? JSON.parse(saved));
 	} catch {
@@ -275,12 +293,6 @@ $("btn-add").addEventListener("click", () => {
 });
 $("btn-patches").addEventListener("click", async () => {
 	const examples = await fetchJson("patches/index.json");
-	const save = () => {
-		const name = prompt("Name für diesen Patch:")?.trim();
-		if (!name) return;
-		library.set(name, rack.toJSON());
-		say(`Gespeichert als „${name}“.`);
-	};
 	const share = async () => {
 		const link = await shareLink();
 		try {
@@ -291,9 +303,9 @@ $("btn-patches").addEventListener("click", async () => {
 		}
 	};
 	pick("Patches", [
-		{ name: "Diesen Patch speichern …", description: "Unter einem Namen, in diesem Browser.", run: save },
+		{ name: "Unter neuem Namen speichern …", description: "Legt eine Kopie des Patches unter einem eigenen Namen ab, in diesem Browser.", run: () => savePatch("") },
 		{ name: "Link zum Teilen kopieren", description: "Der Link enthält den ganzen Patch.", run: share },
-		...Object.entries(library.all()).map(([name, patch]) => ({ group: "Meine Patches", name, description: `${patch.modules.length} Module`, run: () => openPatch(patch), remove: () => library.remove(name) })),
+		...Object.entries(library.all()).map(([name, patch]) => ({ group: "Meine Patches", name, description: `${patch.modules.length} Module`, run: () => openPatch(patch, name), remove: () => library.remove(name) })),
 		...examples.map((ex) => ({ ...ex, group: "Beispiele", run: async () => openPatch(await fetchJson(`patches/${ex.file}`)) })),
 		{ group: "Beispiele", name: "Leeres Rack", description: "Alles entfernen und neu anfangen.", run: () => openPatch({ format: "faust-rack/1", modules: [], cables: [] }) },
 	]);
@@ -344,6 +356,7 @@ $("file").addEventListener("change", async (e) => {
 		say(`Import fehlgeschlagen: ${err.message}`, true);
 	}
 });
+$("btn-save").addEventListener("click", () => savePatch());
 $("btn-undo").addEventListener("click", undo);
 $("btn-redo").addEventListener("click", redo);
 addEventListener("keydown", (e) => {

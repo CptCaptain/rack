@@ -143,3 +143,5 @@ select { font: inherit; font-size: 11px; color: inherit; background: #111216; bo
 }
 .sampler { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 0 8px; padding: 6px; border: 1px dashed var(--line); border-radius: 6px; font-size: 11px; text-align: center; }
 .sampler span { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#patch-name { color: var(--dim); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#patch-name:empty { display: none; }

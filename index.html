@@ -12,6 +12,8 @@
 	<strong>Faust Rack</strong>
 	<button id="btn-add">+ Modul</button>
 	<button id="btn-patches">Patches</button>
+	<button id="btn-save" title="Speichert den Patch unter seinem Namen. Beim ersten Mal fragt er nach einem Namen.">Speichern</button>
+	<span id="patch-name" title="Name des Patches im Rack"></span>
 	<button id="btn-export">Export</button>
 	<button id="btn-import">Import</button>
 	<button id="btn-undo" aria-label="Rückgängig" title="Rückgängig (Strg+Z)">Zurück</button>
@@ -54,7 +56,7 @@
 		<li><b>Aufnehmen:</b> „Aufnahme“ startet, ein zweiter Druck stoppt und lädt eine WAV-Datei herunter.</li>
 		<li><b>Kein Ton?</b> Führt ein Kabel bis in den Output? Ist „Ton“ oben an und Volume aufgedreht?</li>
 	</ul>
-	<p>Der Patch wird im Browser gespeichert. Unter „Patches“ liegen Beispiele, dort kannst du auch eigene Patches unter einem Namen ablegen und einen Link zum Teilen kopieren.</p>
+	<p>Der Patch wird im Browser gespeichert. „Speichern“ legt ihn zusätzlich unter einem Namen ab, so kannst du beliebig viele Patches behalten. Unter „Patches“ findest du sie wieder, neben den Beispielen und dem Link zum Teilen.</p>
 	<form method="dialog">
 		<span id="progress">Lade Faust-Compiler …</span>
 		<button id="start" disabled>Rack starten</button>
