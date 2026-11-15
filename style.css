@@ -33,8 +33,9 @@ button[aria-pressed="true"] { background: #2f5d43; border-color: #7ee0a1; }
 .cables .loose { stroke: #fff; stroke-dasharray: 2 9; }
 
 .module { display: flex; flex-direction: column; min-height: 320px; background: var(--panel); border: 1px solid var(--line); border-top: 5px solid var(--color); border-radius: 6px; user-select: none; -webkit-user-select: none; }
-.module header { display: flex; justify-content: space-between; align-items: center; padding: 2px 2px 2px 10px; }
-.module .close { border: 0; background: none; min-height: 32px; padding: 0 10px; color: var(--dim); font-size: 18px; }
+.module header { display: flex; align-items: center; padding: 2px 2px 2px 10px; }
+.module header b { margin-right: auto; padding-right: 6px; }
+.module .close, .module .move { border: 0; background: none; min-height: 36px; min-width: 28px; padding: 0 6px; color: var(--dim); font-size: 18px; }
 .controls { display: grid; grid-template-columns: repeat(var(--cols), 58px); gap: 8px 2px; padding: 4px 8px; flex: 1; align-content: start; justify-content: center; }
 .control { display: flex; flex-direction: column; align-items: center; text-align: center; font-size: 11px; }
 .control output { color: var(--dim); font-size: 10px; }
@@ -88,3 +89,5 @@ select { font: inherit; font-size: 11px; color: inherit; background: #111216; bo
 .learning .control.target { outline: 2px solid var(--text); }
 .control[data-cc]::before { content: attr(data-cc); position: absolute; top: -4px; right: 0; padding: 0 3px; border-radius: 6px; background: var(--cv); color: #000; font-size: 9px; }
 .note { margin: 0 8px; color: var(--dim); font-size: 11px; text-align: center; }
+.jack.armed i { box-shadow: 0 0 0 3px var(--text); animation: armed 0.8s ease-in-out infinite alternate; }
+@keyframes armed { to { box-shadow: 0 0 0 7px rgb(255 255 255 / 0.25); } }

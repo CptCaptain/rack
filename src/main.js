@@ -162,7 +162,7 @@ async function start() {
 			saveTimer = setTimeout(save, 300);
 		},
 	});
-	view = new RackView(rack, $("rack"));
+	view = new RackView(rack, $("rack"), (text) => say(text, true));
 	const examples = await fetchJson("patches/index.json");
 	const saved = localStorage.getItem(STORE);
 	try {

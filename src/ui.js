@@ -6,6 +6,8 @@ import { pads } from "./pads.js";
 // A widget gets the module definition and { id, poke, value, onOutput }, all keyed by control label.
 const WIDGETS = { keyboard, pads, midiout };
 const SVG = "http://www.w3.org/2000/svg";
+// While a cable is dragged this close to the rack's edge, the rack scrolls.
+const EDGE = 50;
 
 export function h(tag, attrs = {}, ...children) {
 	const el = document.createElement(tag);
@@ -114,9 +116,11 @@ function meter(c, io) {
 const CONTROLS = { knob, toggle, select, button, leds, meter };
 
 export class RackView {
-	constructor(rack, root) {
+	constructor(rack, root, hint = () => {}) {
 		this.rack = rack;
 		this.root = root;
+		this.hint = hint;
+		this.armed = null;
 		this.modulesEl = h("div", { class: "modules" });
 		this.svg = document.createElementNS(SVG, "svg");
 		this.svg.setAttribute("class", "cables");
@@ -128,7 +132,7 @@ export class RackView {
 		this.learnTarget = null;
 		rack.onOutput = (id, address, value) => this.outputs.get(`${id} ${address}`)?.(value);
 		new ResizeObserver(() => this.draw()).observe(this.modulesEl);
-		this.modulesEl.addEventListener("pointerdown", (e) => this.#dragCable(e));
+		this.modulesEl.addEventListener("pointerdown", (e) => this.#pressJack(e));
 		this.modulesEl.addEventListener("dblclick", (e) => this.#unplug(e));
 		this.modulesEl.addEventListener("pointerdown", (e) => this.#pickLearnTarget(e), true);
 		this.modulesEl.addEventListener("dblclick", (e) => this.#forget(e), true);
@@ -186,6 +190,15 @@ export class RackView {
 			this.rack.remove(id);
 			this.render();
 		});
+		const mover = (label, title, delta) => {
+			const button = h("button", { class: "move", title, "aria-label": `${def.name} ${title}` }, label);
+			button.addEventListener("click", () => {
+				this.rack.move(id, delta);
+				this.render();
+				this.modulesEl.querySelector(`.module[data-id="${id}"]`).scrollIntoView({ block: "nearest", inline: "nearest" });
+			});
+			return button;
+		};
 		const controls = def.controls
 			.filter((c) => !c.hidden)
 			.map((c) => {
@@ -207,7 +220,7 @@ export class RackView {
 		return h(
 			"section",
 			{ class: "module", "data-id": id, style: `--color:${def.color};--cols:${def.columns}` },
-			h("header", { title: def.description }, h("b", {}, def.name), close),
+			h("header", { title: def.description }, h("b", {}, def.name), mover("‹", "nach vorn", -1), mover("›", "nach hinten", 1), close),
 			h("div", { class: "controls" }, ...controls),
 			...(widget ? [widget] : []),
 			h("footer", {}, h("div", { class: "jacks in" }, ...def.inputs.map(jack("in"))), h("div", { class: "jacks out" }, ...def.outputs.map(jack("out")))),
@@ -244,44 +257,80 @@ export class RackView {
 		);
 		if (loose) paths.push(path(this.#center(loose.anchor), this.#point(loose.x, loose.y), "loose"));
 		this.svg.replaceChildren(...paths);
+		for (const el of this.modulesEl.querySelectorAll(".jack.armed")) el.classList.remove("armed");
+		const armedEl = this.armed && this.#jackEl(this.armed);
+		if (armedEl) armedEl.parentElement.classList.add("armed");
+		else this.armed = null;
 	}
 
 	#ref(jackEl) {
 		return { id: jackEl.dataset.module, dir: jackEl.dataset.dir, port: Number(jackEl.dataset.port) };
 	}
 
-	// Dragging from a plugged input picks that cable up, so dropping it in the
-	// open removes it and dropping it on another input moves it.
-	#dragCable(down) {
+	// A jack takes two gestures. A drag pulls a cable to another jack. A tap arms the jack,
+	// and a tap on a jack of the other kind then connects the two, with any scrolling in between.
+	#pressJack(down) {
 		const jackEl = down.target.closest(".jack");
 		if (!jackEl) return;
 		down.preventDefault();
-		let anchor = this.#ref(jackEl);
-		if (anchor.dir === "in") {
-			const plugged = this.rack.cables.findLast((c) => c.to[0] === anchor.id && c.to[1] === anchor.port);
-			if (plugged) {
-				this.rack.disconnect(plugged);
-				anchor = { id: plugged.from[0], dir: "out", port: plugged.from[1] };
-			}
-		}
 		jackEl.setPointerCapture(down.pointerId);
-		const move = (e) => this.draw({ anchor, x: e.clientX, y: e.clientY });
+		let anchor = null;
+		let last = down;
+		const follow = () => {
+			if (!anchor) return;
+			const box = this.root.getBoundingClientRect();
+			const push = (at, lo, hi) => (at < lo + EDGE ? at - lo - EDGE : at > hi - EDGE ? at - hi + EDGE : 0) / 4;
+			this.root.scrollBy(push(last.clientX, box.left, box.right), push(last.clientY, box.top, box.bottom));
+			this.draw({ anchor, x: last.clientX, y: last.clientY });
+			requestAnimationFrame(follow);
+		};
+		const move = (e) => {
+			last = e;
+			if (anchor || Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < 8) return;
+			this.armed = null;
+			anchor = this.#grab(this.#ref(jackEl));
+			follow();
+		};
 		const end = (e) => {
 			jackEl.removeEventListener("pointermove", move);
 			jackEl.removeEventListener("pointerup", end);
 			jackEl.removeEventListener("pointercancel", end);
-			const target = e.type === "pointerup" && document.elementFromPoint(e.clientX, e.clientY)?.closest(".jack");
-			if (target && target.dataset.dir !== anchor.dir) {
-				const other = this.#ref(target);
-				const [out, input] = anchor.dir === "out" ? [anchor, other] : [other, anchor];
-				this.rack.connect([out.id, out.port], [input.id, input.port]);
-			}
+			const dragged = anchor;
+			anchor = null;
+			if (e.type !== "pointerup") return this.draw();
+			if (!dragged) return this.#tap(this.#ref(jackEl));
+			const target = document.elementFromPoint(e.clientX, e.clientY)?.closest(".jack");
+			if (target) this.#join(dragged, this.#ref(target));
 			this.draw();
 		};
 		jackEl.addEventListener("pointermove", move);
 		jackEl.addEventListener("pointerup", end);
 		jackEl.addEventListener("pointercancel", end);
-		move(down);
+	}
+
+	// Pulling at a plugged input picks that cable up, so dropping it in the open
+	// removes it and dropping it on another input moves it.
+	#grab(ref) {
+		const plugged = ref.dir === "in" && this.rack.cables.findLast((c) => c.to[0] === ref.id && c.to[1] === ref.port);
+		if (!plugged) return ref;
+		this.rack.disconnect(plugged);
+		return { id: plugged.from[0], dir: "out", port: plugged.from[1] };
+	}
+
+	#join(a, b) {
+		if (a.dir === b.dir) return;
+		const [out, input] = a.dir === "out" ? [a, b] : [b, a];
+		this.rack.connect([out.id, out.port], [input.id, input.port]);
+	}
+
+	#tap(ref) {
+		const same = this.armed && this.armed.id === ref.id && this.armed.dir === ref.dir && this.armed.port === ref.port;
+		if (this.armed && this.armed.dir !== ref.dir) {
+			this.#join(this.armed, ref);
+			this.armed = null;
+		} else this.armed = same ? null : ref;
+		this.hint(this.armed ? "Buchse gewählt. Jetzt die Buchse am anderen Ende antippen, auch nach dem Scrollen. Nochmal antippen bricht ab." : "");
+		this.draw();
 	}
 
 	#unplug(e) {

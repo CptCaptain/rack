@@ -127,6 +127,17 @@ export class Rack {
 		this.onChange();
 	}
 
+	// The order of the modules is the order in the rack and in the saved patch.
+	move(id, delta) {
+		const order = [...this.modules.keys()];
+		const from = order.indexOf(id);
+		const to = Math.min(order.length - 1, Math.max(0, from + delta));
+		if (from < 0 || to === from) return;
+		order.splice(to, 0, ...order.splice(from, 1));
+		this.modules = new Map(order.map((key) => [key, this.modules.get(key)]));
+		this.onChange();
+	}
+
 	// Swaps every instance of a recompiled module in place. Knob values and
 	// cables survive where the new version still has that knob or jack.
 	async update(def) {

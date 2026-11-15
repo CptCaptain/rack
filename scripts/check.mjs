@@ -107,6 +107,39 @@ try {
 	check((await cables()) === first.cables.length, "dragging from output jack to input jack adds a cable");
 	check((await peak()) > 0.005, "signal is back");
 
+	await page.click(jack("vco1", "out", 0));
+	check((await page.locator(".jack.armed").count()) === 1, "tapping a jack arms it");
+	await page.click(jack("output1", "in", 1));
+	check((await cables()) === first.cables.length + 1 && (await page.locator(".jack.armed").count()) === 0, "tapping a second jack connects the two");
+
+	// Phone: the rack is taller than the screen, so the two ends of a cable are never both visible.
+	await page.setViewportSize({ width: 390, height: 700 });
+	const scrollTop = () => page.evaluate(() => document.getElementById("rack").scrollTop);
+	await page.evaluate(() => document.getElementById("rack").scrollTo(0, 0));
+	await page.click(jack("clock1", "out", 2));
+	await page.evaluate(() => document.getElementById("rack").scrollTo(0, 1e6));
+	const scrolled = await scrollTop();
+	await page.click(jack("output1", "in", 2));
+	check(scrolled > 500 && (await cables()) === first.cables.length + 2, `on a phone: tap, scroll ${scrolled} px, tap connects`);
+	await page.evaluate(() => document.getElementById("rack").scrollTo(0, 0));
+	const from = await center(jack("clock1", "out", 0));
+	await page.mouse.move(...from);
+	await page.mouse.down();
+	await page.mouse.move(from[0] + 30, 690, { steps: 5 });
+	await page.waitForTimeout(1200);
+	const pulled = await scrollTop();
+	await page.mouse.up();
+	check(pulled > 200 && (await cables()) === first.cables.length + 2, `on a phone: dragging a cable to the edge scrolls the rack (${pulled} px)`);
+	await page.setViewportSize({ width: 1500, height: 900 });
+
+	const order = () => page.evaluate(() => [...document.querySelectorAll(".module")].map((el) => el.dataset.id).join(" "));
+	const before = (await order()).split(" ");
+	await page.click('.module[data-id="clock1"] .move >> nth=1');
+	await page.click('.module[data-id="output1"] .move >> nth=0');
+	const expected = [before[1], before[0], ...before.slice(2, -2), before.at(-1), before.at(-2)].join(" ");
+	const savedOrder = await page.evaluate(() => window.faustRack.rack.toJSON().modules.map((m) => m.id).join(" "));
+	check((await order()) === expected && savedOrder === expected && (await peak()) > 0.005, `the arrows reorder modules and the patch keeps playing: ${expected}`);
+
 	const dial = await center('.module[data-id="output1"] .dial');
 	await drag(dial, [dial[0], dial[1] - 60]);
 	const volume = await page.evaluate(() => Object.values(window.faustRack.rack.modules.get("output1").params)[0]);
