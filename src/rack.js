@@ -356,6 +356,37 @@ export class Rack {
 		for (const m of patch.mods) await this.modulate(m.from, m.to, m.depth);
 	}
 
+	// Turns the rack into the given patch by changing only what differs. Modules that stay keep
+	// running, so undo does not interrupt the sound the way loading a patch does.
+	async reconcile(data) {
+		const patch = parsePatch(data, this.defs);
+		const wanted = new Map(patch.modules.map((m) => [m.id, m]));
+		for (const [id, inst] of [...this.modules]) if (wanted.get(id)?.type !== inst.def.id) this.remove(id);
+		for (const m of patch.modules) {
+			if (!this.modules.has(m.id)) await this.add(m.type, m);
+			const inst = this.modules.get(m.id);
+			for (const address of Object.keys(inst.params)) {
+				if (address in m.params) continue;
+				delete inst.params[address];
+				this.#apply(m.id, address);
+			}
+			for (const [address, value] of Object.entries(m.params)) if (inst.params[address] !== value) this.setParam(m.id, address, value);
+			if (inst.muted !== m.muted) this.setMuted(m.id, m.muted);
+		}
+		this.modules = new Map(patch.modules.map((m) => [m.id, this.modules.get(m.id)]));
+		const same = (a, b) => a.from[0] === b.from[0] && a.from[1] === b.from[1] && a.to[0] === b.to[0] && a.to[1] === b.to[1];
+		for (const cable of [...this.cables]) if (!patch.cables.some((c) => same(c, cable))) this.disconnect(cable);
+		for (const c of patch.cables) this.connect(c.from, c.to);
+		for (const mod of [...this.mods]) if (!patch.mods.some((m) => same(m, mod))) this.unmodulate(mod);
+		for (const m of patch.mods) {
+			const mod = await this.modulate(m.from, m.to, m.depth);
+			if (mod.depth !== m.depth) this.setDepth(mod, m.depth);
+		}
+		this.midi.clear();
+		for (const m of patch.midi) this.learn(m.cc, m.module, m.address);
+		this.onChange();
+	}
+
 	toJSON() {
 		return {
 			format: FORMAT,

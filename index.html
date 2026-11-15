@@ -14,6 +14,8 @@
 	<button id="btn-patches">Patches</button>
 	<button id="btn-export">Export</button>
 	<button id="btn-import">Import</button>
+	<button id="btn-undo" aria-label="Rückgängig" title="Rückgängig (Strg+Z)">↶</button>
+	<button id="btn-redo" aria-label="Wiederholen" title="Wiederholen (Strg+Umschalt+Z)">↷</button>
 	<button id="btn-record" aria-pressed="false" title="Nimmt auf, was das Rack spielt, und lädt es als WAV-Datei herunter">Aufnahme</button>
 	<button id="btn-power" aria-pressed="true">Ton</button>
 	<button id="btn-midi" aria-pressed="false">MIDI</button>
@@ -39,13 +41,14 @@
 	<ul>
 		<li><b>Regler:</b> ziehen, hoch ist mehr. Mit Umschalt feiner, Doppelklick setzt zurück.</li>
 		<li><b>Kabel stecken:</b> von einer Buchse zur anderen ziehen. Oder eine Buchse antippen: Du hast dann ein Kabel in der Hand und steckst es mit einem Tipp auf die andere Buchse. Dazwischen kannst du scrollen, das hilft am Handy. Ein Tipp daneben legt das Kabel weg. Ausgänge liegen im hellen Feld.</li>
-		<li><b>Module umsortieren:</b> mit den Pfeilen ‹ › oben im Modul.</li>
+		<li><b>Module umsortieren:</b> ein Modul an seinem Namen greifen und dorthin ziehen, wo es stehen soll. Oder die Pfeile ‹ › oben im Modul.</li>
 		<li><b>Anzeigen:</b> Jede Buchse leuchtet, wenn dort ein Signal liegt. Das kleine Bild oben im Modul zeigt, was es gerade ausgibt.</li>
 		<li><b>Stummschalten:</b> Das M oben im Modul schaltet es stumm. Es gibt dann an keiner Buchse mehr etwas aus, läuft aber weiter.</li>
 		<li><b>Kabel lösen:</b> eine Buchse lange drücken. Die Liste nennt jedes Kabel dort, das gewählte leuchtet im Rack. Das × oder die Taste Entf löscht es, die Pfeiltasten wechseln, Escape schließt. Ein Tipp auf ein Kabel öffnet dieselbe Liste für die Kabel unter dem Finger. Oder am Eingang greifen und ins Leere ziehen.</li>
 		<li><b>Regler modulieren:</b> ein Kabel von einem Ausgang auf einen Regler ziehen, zum Beispiel vom LFO. Oder den Ausgang antippen und dann den Regler. Der Regler bewegt sich dann von selbst, ein Punkt zeigt wohin. Das Kabel antippen stellt die Stärke ein.</li>
 		<li><b>Spielen:</b> Im Keyboard-Modul klicken oder die Tasten A bis L drücken, W E T Z U O sind die schwarzen Tasten.</li>
 		<li><b>MIDI-Geräte:</b> „MIDI“ drücken und im Browser erlauben. Die Tasten spielen das Keyboard-Modul, Pads auf Kanal 10 das Pads-Modul. Für Drehregler „Lernen“ einschalten, einen Regler im Rack antippen und den Regler am Gerät bewegen. Das Modul „MIDI Out“ spielt ein angeschlossenes Gerät, „Audio In“ holt dessen Klang ins Rack.</li>
+		<li><b>Rückgängig:</b> ↶ oder Strg+Z nimmt den letzten Schritt zurück, ↷ oder Strg+Umschalt+Z holt ihn wieder. Der Klang läuft dabei weiter.</li>
 		<li><b>Aufnehmen:</b> „Aufnahme“ startet, ein zweiter Druck stoppt und lädt eine WAV-Datei herunter.</li>
 		<li><b>Kein Ton?</b> Führt ein Kabel bis in den Output? Ist „Ton“ oben an und Volume aufgedreht?</li>
 	</ul>

@@ -17,6 +17,38 @@ let rack;
 let view;
 let library;
 
+// Undo: every saved state of the patch goes on a stack. Turning a knob saves once it rests.
+const history = { past: [], future: [], current: null, restoring: false };
+
+function remember() {
+	const now = JSON.stringify(rack);
+	localStorage.setItem(STORE, now);
+	if (history.restoring || now === history.current) return;
+	if (history.current) history.past.push(history.current);
+	history.past.splice(0, history.past.length - 100);
+	history.future.length = 0;
+	history.current = now;
+}
+
+const stepHistory = (from, to) =>
+	serial(async () => {
+		if (!from.length) return;
+		to.push(history.current);
+		history.current = from.pop();
+		history.restoring = true;
+		try {
+			await rack.reconcile(JSON.parse(history.current));
+		} finally {
+			// The rack may list the same patch in another order than the stack had it. Taking the
+			// rack's own wording keeps the next save from looking like a new change.
+			history.current = JSON.stringify(rack);
+			history.restoring = false;
+			view.render();
+		}
+	});
+const undo = () => stepHistory(history.past, history.future);
+const redo = () => stepHistory(history.future, history.past);
+
 let statusTimer;
 function say(text, sticky = false) {
 	$("status").textContent = text;
@@ -155,7 +187,6 @@ compiled.catch((err) => ($("progress").textContent = `Start fehlgeschlagen: ${er
 async function start() {
 	const failed = await compiled;
 	const ctx = new AudioContext({ latencyHint: "interactive" });
-	const save = () => localStorage.setItem(STORE, JSON.stringify(rack));
 	let saveTimer;
 	rack = new Rack(ctx, library.defs, {
 		onRemove: (id) => {
@@ -164,7 +195,7 @@ async function start() {
 		},
 		onChange: () => {
 			clearTimeout(saveTimer);
-			saveTimer = setTimeout(save, 300);
+			saveTimer = setTimeout(remember, 300);
 		},
 	});
 	view = new RackView(rack, $("rack"), (text) => say(text, true));
@@ -182,7 +213,7 @@ async function start() {
 	setTimeout(pollModules, POLL_MS);
 	// Once allowed, MIDI comes back on its own; the first time needs the button because the browser asks.
 	navigator.permissions?.query({ name: "midi" }).then((permission) => permission.state === "granted" && connectMidi(), () => {});
-	window.faustRack = { rack, view, library, openPatch };
+	window.faustRack = { rack, view, library, openPatch, history };
 	$("start").textContent = "Weiter";
 	$("bar").inert = false;
 }
@@ -259,6 +290,13 @@ $("file").addEventListener("change", async (e) => {
 	} catch (err) {
 		say(`Import fehlgeschlagen: ${err.message}`, true);
 	}
+});
+$("btn-undo").addEventListener("click", undo);
+$("btn-redo").addEventListener("click", redo);
+addEventListener("keydown", (e) => {
+	if (!(e.ctrlKey || e.metaKey) || e.code !== "KeyZ" || e.target.closest?.("input, textarea, select")) return;
+	e.preventDefault();
+	e.shiftKey ? redo() : undo();
 });
 $("btn-midi").addEventListener("click", connectMidi);
 $("btn-learn").addEventListener("click", () => {
