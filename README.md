@@ -1,61 +1,102 @@
-# Faust Rack
+# Rack
 
-Ein modularer Synthesizer im Browser. Jedes Modul ist ein Faust-Programm. Der Browser kompiliert es beim Laden mit `@grame/faustwasm` zu einem AudioWorklet. Kabel sind Web-Audio-Verbindungen zwischen den Worklets.
+A modular synth in the browser. Every module is a [Faust](https://faust.grame.fr) program. The page compiles it with `@grame/faustwasm` into an AudioWorklet, and a cable is a Web Audio connection between two worklets.
 
-Die Seite besteht aus statischen Dateien. Es gibt keinen Bundler und kein Backend.
+The site is static files. There is no bundler and no backend. The interface is in German.
 
-## Starten
+## What it does
 
-```sh
-npm install --include=dev   # kopiert faustwasm nach vendor/
-npm run dev                 # http://localhost:5173
-```
+- 32 modules: oscillators, filter, envelopes, sequencers, drums, effects, a quantizer, and a small evolving world as a signal source.
+- Patch by dragging from jack to jack, or tap one jack and then the other. Drop a cable on a knob to modulate it.
+- A rack that is open in a browser picks up new and changed modules within seconds, without a reload.
+- Web MIDI: play the keyboard and pad modules, bind hardware knobs to rack knobs, send notes to a synth.
+- The patch is saved in the browser and exports to JSON.
 
-`--include=dev` holt `playwright-core` für `npm run check`, auch wenn `NODE_ENV=production` gesetzt ist.
+## Run it locally
 
-## Bauen und selbst hosten
-
-```sh
-npm run build     # schreibt dist/
-npm run preview   # zeigt dist/ auf http://localhost:5173
-```
-
-`dist/` enthält alles und ist etwa 7 MB groß. Fast alles davon ist der Faust-Compiler. Jeder Webserver für statische Dateien genügt. Der Browser erlaubt AudioWorklets aber nur über HTTPS oder `localhost`.
-
-COOP- und COEP-Header braucht die Seite nicht, weil sie keinen `SharedArrayBuffer` benutzt.
-
-## Prüfen
+Tested with Node.js 22.
 
 ```sh
-npm run check     # oder: node scripts/check.mjs dist bild.png
+npm install --include=dev
+npm run dev
 ```
 
-`npm run modules` kompiliert alle Module ohne Browser. `node scripts/probe.mjs` rendert kleine Testpatches und prüft Zahlen wie Trefferzahl, Tonleiter und Stimmung.
+Open `http://localhost:5173`. `npm install` copies the Faust compiler into `vendor/`.
 
-`npm run check` lädt `dist/` in Chromium ohne Fenster. Es schlägt fehl, wenn ein Modul nicht kompiliert, ein Beispielpatch kein Signal am Ausgang liefert oder die Konsole einen Fehler zeigt. Es zieht auch ein Kabel und einen Regler mit der Maus, tauscht ein Modul im Betrieb und spielt über ein simuliertes MIDI-Gerät und ein simuliertes Mikrofon.
+## Add a module
 
-## Echte Geräte
+A module is two files in `modules/` and one entry in `modules/index.json`.
 
-Web MIDI und der Audio-Eingang brauchen Chrome oder Edge und HTTPS oder `localhost`. Der Knopf **MIDI** fragt einmal um Erlaubnis.
+`modules/fold.dsp` is the sound. The inputs and outputs of `process` are the jacks:
 
-- Noten spielen jedes Keyboard-Modul. Noten auf Kanal 10 schlagen die Pads im Pads-Modul an, Note 36 ist Pad 1.
-- Pitch-Bend und Modulationsrad kommen am Keyboard-Modul an.
-- **Lernen** bindet einen Regler am Gerät an einen Regler im Rack. Der Patch speichert die Bindung.
-- Das Modul MIDI Out schickt Pitch und Gate als Noten an alle MIDI-Ausgänge.
-- Das Modul Audio In holt den Audio-Eingang des Rechners ins Rack.
+```faust
+import("stdfaust.lib");
 
-## Aufbau
+amount = hslider("[0]Amount", 2, 1, 10, 0.01) : si.smoo;
 
-| Pfad | Aufgabe |
+process = *(amount) : sin;
+```
+
+`modules/fold.json` names the module and its jacks, in the order of `process`:
+
+```json
+{
+	"name": "Fold",
+	"description": "Folds a wave back on itself.",
+	"color": "#9bc53d",
+	"inputs": [{ "name": "In", "kind": "audio" }],
+	"outputs": [{ "name": "Out", "kind": "audio" }]
+}
+```
+
+1. Write both files.
+2. Run `npm run modules -- fold`. It compiles the module without a browser and prints its jacks, its knobs, or the Faust error.
+3. Add `"fold"` to `modules/index.json`.
+
+The rack builds the knobs from the Faust UI elements. Pitch follows 1 V per octave with 0 at C4, a gate is 0 or 1, and every cable carries an audio-rate signal. [MODULES.md](MODULES.md) is the full reference for the module and patch formats. It is written in German.
+
+## Run the tests
+
+```sh
+npm run modules           # compiles every module, without a browser
+npm run build
+node scripts/probe.mjs    # renders test patches offline and checks the numbers
+npm run check             # drives the built site in headless Chromium
+```
+
+`probe` and `check` need Chromium. They look for it at `/usr/bin/chromium`. Set `CHROMIUM` to another path if yours is elsewhere.
+
+## Host it yourself
+
+```sh
+npm run build
+```
+
+`dist/` then holds the whole site, about 7 MB, most of it the Faust compiler. Any web server for static files can serve it.
+
+- **HTTPS is required.** Browsers allow AudioWorklet, Web MIDI, and the audio input only on HTTPS or on `localhost`.
+- **COOP and COEP headers are not needed.** The page does not use `SharedArrayBuffer`. You can leave cross-origin isolation off.
+- **Send `Cache-Control: no-cache`.** The browser then asks the server on each load, and a new build shows up at once.
+- **Live modules.** To let an open rack pick up modules without a build, serve `modules/` and `patches/` from the checkout and everything else from `dist/`. [deploy/compose.example.yaml](deploy/compose.example.yaml) does that with Caddy in a container.
+
+Changes to `src/`, `index.html`, or `style.css` need `npm run build` and a reload of the page.
+
+## Layout
+
+| Path | Job |
 | --- | --- |
-| `modules/` | Die Module. [MODULES.md](MODULES.md) beschreibt das Format. |
-| `patches/` | Beispielpatches und ihre Liste. |
-| `src/faust.js` | Lädt und kompiliert Module, erkennt Änderungen. |
-| `src/rack.js` | Audio-Graph und Patch-Zustand, ohne DOM. |
-| `src/ui.js` | Module, Regler und Kabel im DOM. |
-| `src/controls.js` | Rechnet Reglerstellung in Werte um, auch für MIDI. |
-| `src/displays.js` | Live-Anzeigen: Bild im Modul und Licht in jeder Buchse, eine Schleife für alle. |
-| `src/keyboard.js`, `src/pads.js` | Klaviatur und Schlagflächen: Bildschirm, Computertasten, MIDI. |
-| `src/midi.js`, `src/midiout.js` | Web MIDI: Eingänge lesen, Noten senden. |
-| `src/main.js` | Start, Menüs, Speichern, Abgleich mit `modules/`. |
+| `modules/` | The modules. |
+| `patches/` | Example patches and their list. |
+| `src/faust.js` | Loads and compiles modules, and notices changes. |
+| `src/rack.js` | The audio graph and the patch, without DOM. |
+| `src/ui.js` | Modules, knobs, and cables in the DOM. |
+| `src/displays.js` | The live display in each module and the light in each jack. |
+| `src/controls.js` | Maps a knob's travel to its value, also for MIDI and modulation. |
+| `src/keyboard.js`, `src/pads.js` | Keys and pads: screen, computer keyboard, MIDI. |
+| `src/midi.js`, `src/midiout.js` | Web MIDI: read inputs, send notes. |
+| `src/life.js`, `src/life-world.js` | The world of the Leben module. |
 | `scripts/` | `vendor`, `build`, `serve`, `check`, `modules`, `probe`. |
+
+## License
+
+MIT, see [LICENSE](LICENSE). The Faust compiler and libraries that the page loads keep their own licenses. [NOTICE](NOTICE) lists them.

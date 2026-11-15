@@ -1,0 +1,50 @@
+# Example: serve the rack with Caddy in a container. Copy it to deploy/compose.yaml, which git
+# ignores, and put in your own path and port.
+#
+# The page's code comes from the built dist/. modules/ and patches/ come straight from the
+# checkout, so a module written there shows up in an open rack within seconds, without a build.
+#
+# Put a reverse proxy with HTTPS in front: browsers allow AudioWorklet, Web MIDI and the audio
+# input only on HTTPS or localhost.
+services:
+  rack:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      XDG_CONFIG_HOME: /tmp/config
+      XDG_DATA_HOME: /tmp/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - /path/to/rack:/repo:ro
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    healthcheck:
+      test: wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1
+      interval: 30s
+      retries: 3
+    ports:
+      - "127.0.0.1:8080:8080"
+configs:
+  caddyfile:
+    content: |
+      {
+        admin off
+        auto_https off
+      }
+      :8080 {
+        header Cache-Control no-cache
+        @live path /modules/* /patches/*
+        handle @live {
+          root * /repo
+          file_server
+        }
+        handle {
+          root * /repo/dist
+          file_server
+        }
+      }

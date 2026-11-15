@@ -1,0 +1,52 @@
+Rack
+Copyright (c) 2026 CptCaptain
+
+Everything in this repository is licensed under the MIT License (see LICENSE).
+The repository contains no third-party code. It depends on the software below,
+which npm installs and which keeps its own licence.
+
+Used at run time, in the browser
+--------------------------------
+
+@grame/faustwasm, with the Faust compiler (libfaust) it bundles
+  Copyright (c) GRAME, Centre National de Creation Musicale, and INRIA
+  GNU Lesser General Public License, version 2.1 or later
+  https://github.com/grame-cncm/faustwasm
+  https://github.com/grame-cncm/faust
+
+  `npm install` copies its files unchanged into vendor/faustwasm/, and
+  `npm run build` copies them into dist/vendor/faustwasm/, together with its
+  COPYING.txt. If you host dist/, you distribute these files: keep COPYING.txt
+  next to them. They stay separate files, so anyone can replace them with
+  another build of the library.
+
+The Faust libraries (stdfaust.lib), bundled inside faustwasm
+  https://github.com/grame-cncm/faustlibraries
+
+  The modules in modules/ import these libraries. The page compiles each module
+  in the browser, and the compiled module then contains the library functions
+  it calls. Read from the library sources bundled in faustwasm 0.20.2:
+
+  - fi.highpass, fi.lowpass, fi.tf1 and ve.moogLadder declare STK-4.3, an
+    MIT-style licence.
+  - The other functions the modules call declare no licence of their own and
+    fall under the header of their library file: the LGPL, version 2.1 or
+    later, with the Faust exception, which lets a larger work that contains
+    the library carry any licence. These are an.amp_follower_ar, ba.countdown,
+    ba.sAndH, ba.tau2pole, de.fdelay, en.adsr, en.ar, ma.PI, ma.SR, ma.frac,
+    ma.tanh, no.noise, no.pink_noise, os.osc, os.oscp, os.sawtooth, os.square,
+    re.zita_rev1_stereo, si.smoo and si.smooth.
+
+  Some functions in these libraries declare GPL-3.0-only, among them the
+  look-ahead limiters in compressors.lib. The modules here call none of them,
+  and the Output module carries its own limiter for that reason. Before a new
+  module calls a library function, look for its `declare <name> license` line
+  in the library source.
+
+Used for the tests only
+-----------------------
+
+playwright-core
+  Copyright (c) Microsoft Corporation
+  Apache License 2.0
+  https://github.com/microsoft/playwright

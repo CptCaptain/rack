@@ -1,3 +1,5 @@
 node_modules/
 vendor/
 dist/
+# The real deployment, with its hosts and paths, stays local. deploy/compose.example.yaml is the public template.
+deploy/compose.yaml

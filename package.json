@@ -3,7 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Browser-Eurorack: Module sind Faust-DSP-Dateien, im Browser zu AudioWorklets kompiliert.",
+  "description": "A modular synth in the browser. Every module is a Faust program, compiled in the page into an AudioWorklet.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CptCaptain/rack.git"
+  },
   "scripts": {
     "postinstall": "node scripts/vendor.mjs",
     "dev": "node scripts/serve.mjs .",
