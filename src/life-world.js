@@ -1,5 +1,6 @@
 // A small world for the Leben module: creatures look for food, pay energy to live,
-// split into two when they have plenty, and starve when they run out. A child inherits
+// split into two when they have plenty, and starve when they run out. When the last one
+// dies, a single creature that fits the current climate is born a moment later. A child inherits
 // its parent's genes with small random changes, so the population adapts to the environment.
 export const WIDTH = 100;
 export const HEIGHT = 60;
@@ -13,6 +14,10 @@ const CLIMATE_COST = 0.15;
 const MUTATION_STEP = 0.4;
 // Each gene's range. warmth is the climate a creature is built for.
 const GENES = { speed: [0.3, 2], sense: [3, 25], warmth: [0, 1] };
+
+// The first creature after an extinction. Its speed is where populations settled in the
+// tuning runs (1.4 to 1.9), its sight is the middle of the range.
+const PIONEER = { speed: 1.5, sense: 14 };
 
 const wrap = (d, size) => (d > size / 2 ? d - size : d < -size / 2 ? d + size : d);
 const clamp = (v, [lo, hi]) => Math.min(hi, Math.max(lo, v));
@@ -82,9 +87,13 @@ export class World {
 				births.push(child.warmth);
 			}
 		}
-		// After an extinction the world stays empty for a moment, then life starts again.
+		// After an extinction the world stays empty for a moment. Then one creature is born that
+		// fits the climate of that moment. The food stays as it lies, nothing else starts over.
 		if (this.creatures.length) this.empty = 0;
-		else if (++this.empty > EXTINCT_STEPS) this.populate();
+		else if (++this.empty > EXTINCT_STEPS) {
+			this.creatures.push({ x: this.random() * WIDTH, y: this.random() * HEIGHT, dir: 0, energy: 1, ...PIONEER, warmth: env.climate });
+			births.push(env.climate);
+		}
 		return { births, deaths };
 	}
 

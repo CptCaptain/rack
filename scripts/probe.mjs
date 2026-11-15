@@ -123,8 +123,19 @@ const life = await page.evaluate(async () => {
 		return off / counted;
 	};
 	const seasons = (i) => 0.5 + 0.3 * Math.sin((i / 6000) * 2 * Math.PI);
-	return { steady: lag(0.3, () => 0.8, 8000), evolving: lag(0.8, seasons, 12000), frozen: lag(0, seasons, 12000) };
+	// Starve everything, then let it rain food in a warm climate and watch what comes back.
+	const world = new World(1);
+	while (world.creatures.length) world.step({ food: 0, climate: 0.1, mutation: 0.3 });
+	const foodLeft = world.food.length;
+	let reborn;
+	for (let i = 0; i < 200 && !world.creatures.length; i++) reborn = world.step({ food: 0, climate: 0.9, mutation: 0.3 });
+	const pioneer = { count: world.creatures.length, warmth: world.creatures[0]?.warmth, births: reborn.births.join(), foodKept: world.food.length === foodLeft };
+	for (let i = 0; i < 4000; i++) world.step({ food: 0.5, climate: 0.9, mutation: 0.3 });
+	return { steady: lag(0.3, () => 0.8, 8000), evolving: lag(0.8, seasons, 12000), frozen: lag(0, seasons, 12000), pioneer, regrown: world.creatures.length };
 });
+const rebirth = life.pioneer.count === 1 && life.pioneer.warmth === 0.9 && life.pioneer.births === "0.9" && life.pioneer.foodKept && life.regrown > 5;
+if (!rebirth) failed++;
+console.log(`${rebirth ? "ok  " : "FAIL"} after an extinction one creature is born that fits the climate, and it repopulates the world: ${JSON.stringify(life.pioneer)}, ${life.regrown} creatures 4000 steps later`);
 for (const [name, value, ok] of [
 	["life in a steady warm climate carries the matching gene (distance)", life.steady, between(0, 0.08)],
 	["life with mutation follows slow seasons (distance)", life.evolving, between(0, 0.1)],

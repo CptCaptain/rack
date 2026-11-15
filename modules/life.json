@@ -4,7 +4,7 @@
   "color": "#7bd389",
   "widget": "life",
   "columns": 4,
-  "description": "Eine kleine Welt: Wesen suchen Futter, vermehren sich mit kleinen Fehlern im Erbgut und verhungern. Jede Geburt spielt einen Ton aus dem Erbgut. Dreh am Klima und sieh zu, wie sie sich anpassen oder aussterben.",
+  "description": "Eine kleine Welt: Wesen suchen Futter, vermehren sich mit kleinen Fehlern im Erbgut und verhungern. Jede Geburt spielt einen Ton aus dem Erbgut. Dreh am Klima und sieh zu, wie sie sich anpassen oder aussterben. Nach dem Aussterben wird ein Wesen geboren, das zum Klima passt.",
   "inputs": [
     {
       "name": "Futter",
