@@ -35,7 +35,11 @@ function parseControl(item) {
 			const { min, max, step, init } = item;
 			const menu = /^(?:menu|radio)\{(.*)\}$/.exec(meta.style ?? "");
 			if (menu) {
-				const options = [...menu[1].matchAll(/'([^']*)'\s*:\s*(-?[\d.]+)/g)].map(([, label, value]) => ({ label, value: Number(value) }));
+				// Faust's JSON writes the quotes around each name as "-", so drop one character on each side.
+				const options = menu[1].split(";").map((entry) => {
+					const at = entry.lastIndexOf(":");
+					return { label: entry.slice(1, at - 1), value: Number(entry.slice(at + 1)) };
+				});
 				return { ...base, type: "select", init, options };
 			}
 			const type = max - min === step ? "toggle" : "knob";
