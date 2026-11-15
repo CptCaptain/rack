@@ -6,6 +6,7 @@ import { openMidi } from "./midi.js";
 import { releaseMidiOut } from "./midiout.js";
 import { hitPad } from "./pads.js";
 import { Rack } from "./rack.js";
+import { loadSample } from "./samples.js";
 import { MAX_RECORDING_MINUTES, startRecording } from "./record.js";
 import { RackView, h } from "./ui.js";
 
@@ -221,6 +222,7 @@ async function start() {
 	const ctx = new AudioContext({ latencyHint: "interactive" });
 	let saveTimer;
 	rack = new Rack(ctx, modules.defs, {
+		loadSample,
 		onRemove: (id) => {
 			releaseMidiOut(id);
 			forgetWorld(id);

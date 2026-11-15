@@ -5,9 +5,11 @@ import { keyboard } from "./keyboard.js";
 import { life } from "./life.js";
 import { midiout } from "./midiout.js";
 import { pads } from "./pads.js";
+import { sampler } from "./sampler.js";
+import { importSample } from "./samples.js";
 
 // A widget gets the module definition and { id, poke, set, value, onOutput, muted }, keyed by control label where they name a control.
-const WIDGETS = { keyboard, pads, midiout, life, grid, steps };
+const WIDGETS = { keyboard, pads, midiout, life, grid, steps, sampler };
 const SVG = "http://www.w3.org/2000/svg";
 // While a cable is dragged this close to the rack's edge, the rack scrolls.
 const EDGE = 50;
@@ -269,6 +271,11 @@ export class RackView {
 			value: (label) => this.rack.modules.get(id).params[address(label)] ?? def.controls.find((c) => c.label === label).init,
 			onOutput: (label, fn) => this.outputs.set(`${id} ${address(label)}`, fn),
 			muted: () => this.rack.modules.get(id).muted,
+			sample: () => this.rack.modules.get(id).sample?.name,
+			loadSample: async (file) => {
+				await this.rack.setSample(id, await importSample(this.rack.ctx, file));
+				this.render();
+			},
 		});
 		const jack = (dir) => (port, index) =>
 			h("div", { class: `jack ${port.kind}`, "data-module": id, "data-dir": dir, "data-port": index }, h("i"), h("span", {}, port.name));

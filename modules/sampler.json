@@ -1,0 +1,24 @@
+{
+  "name": "Sampler",
+  "group": "Klangquellen",
+  "color": "#f4a261",
+  "widget": "sampler",
+  "columns": 2,
+  "description": "Spielt eine eigene Aufnahme ab: Jeder Impuls startet sie, der Pitch-Eingang bestimmt die Tonhöhe. Eine Audiodatei per Knopf laden oder auf das Modul ziehen. Bis dahin spielt eine Glocke.",
+  "inputs": [
+    {
+      "name": "V/Oct",
+      "kind": "cv"
+    },
+    {
+      "name": "Trig",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

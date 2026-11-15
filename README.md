@@ -6,7 +6,7 @@ The site is static files. There is no bundler and no backend. The interface is i
 
 ## What it does
 
-- 34 modules: oscillators, filter, envelopes, sequencers, a drum grid, drums, effects, a quantizer, and a small evolving world as a signal source.
+- 35 modules: oscillators, a sampler for your own audio files, filter, envelopes, sequencers, a drum grid, drums, effects, a quantizer, and a small evolving world as a signal source.
 - Four-voice polyphony that spreads along the cables: play chords on the Poly Keyboard and every module behind it runs once per voice.
 - Undo, named patches, a share link that carries the patch, and recording to WAV.
 - Patch by dragging from jack to jack, or tap one jack and then the other. Drop a cable on a knob to modulate it.
@@ -97,6 +97,9 @@ Changes to `src/`, `index.html`, or `style.css` need `npm run build` and a reloa
 | `src/keyboard.js`, `src/pads.js` | Keys and pads: screen, computer keyboard, MIDI. |
 | `src/midi.js`, `src/midiout.js` | Web MIDI: read inputs, send notes. |
 | `src/life.js`, `src/life-world.js` | The world of the Leben module. |
+| `src/grid.js` | The Beat grid and the sequencer's step buttons. |
+| `src/sampler.js`, `src/samples.js` | The Sampler's file loader and where samples are kept. |
+| `src/record.js` | Records the output to a WAV file. |
 | `scripts/` | `vendor`, `build`, `serve`, `check`, `modules`, `probe`. |
 
 ## License

@@ -1,5 +1,6 @@
 import { clamp, travel } from "./controls.js";
 import { POLY } from "./faust.js";
+import { bell } from "./samples.js";
 
 export const FORMAT = "faust-rack/1";
 // Muting fades over this long, so cutting a sounding module does not click.
@@ -16,7 +17,7 @@ export function parsePatch(data, defs) {
 			throw new Error(`Ungültige oder doppelte Modul-ID: ${m?.id}`);
 		if (!defs.has(m.type)) throw new Error(`Unbekanntes Modul „${m.type}“`);
 		types.set(m.id, defs.get(m.type));
-		return { id: m.id, type: m.type, params: { ...m.params }, muted: m.muted === true };
+		return { id: m.id, type: m.type, params: { ...m.params }, muted: m.muted === true, sample: typeof m.sample === "string" ? m.sample : undefined };
 	});
 	const cables = data.cables.map((c) => {
 		if (!isRef(c?.from) || !isRef(c?.to)) throw new Error("Kabel brauchen from und to als [Modul-ID, Buchsen-Nummer]");
@@ -42,7 +43,7 @@ export class Rack {
 	#external;
 	#taps;
 
-	constructor(ctx, defs, { onChange = () => {}, onOutput = () => {}, onRemove = () => {}, onModulated = () => {}, onRebuilt = () => {} } = {}) {
+	constructor(ctx, defs, { onChange = () => {}, onOutput = () => {}, onRemove = () => {}, onModulated = () => {}, onRebuilt = () => {}, loadSample = async () => null } = {}) {
 		this.ctx = ctx;
 		this.defs = defs;
 		this.onChange = onChange;
@@ -50,6 +51,7 @@ export class Rack {
 		this.onRemove = onRemove;
 		this.onModulated = onModulated;
 		this.onRebuilt = onRebuilt;
+		this.loadSample = loadSample;
 		// Resolves when every module has the number of voices its cables call for.
 		this.settled = Promise.resolve();
 		this.batch = false;
@@ -88,10 +90,12 @@ export class Rack {
 		return this.#external;
 	}
 
-	async #node(def, voices) {
+	async #node(def, voices, sample) {
 		const external = def.microphone ? await this.#openExternal() : null;
 		const generator = voices > def.voices ? await def.perVoice() : def.generator;
-		return [await generator.createNode(this.ctx, def.id), external];
+		// A sampled module gets its own copy of the compiled program with its sample in it.
+		const factory = def.sampled ? { ...generator.factory, soundfiles: { sample: sample ?? bell(this.ctx.sampleRate) } } : generator.factory;
+		return [await generator.createNode(this.ctx, def.id, factory), external];
 	}
 
 	// A module with several voices has each jack once per voice: channel = voice * jacks + jack.
@@ -141,13 +145,15 @@ export class Rack {
 		inst.node.destroy();
 	}
 
-	async add(type, { id, params = {}, muted = false } = {}) {
+	async add(type, { id, params = {}, muted = false, sample } = {}) {
 		const def = this.defs.get(type);
 		if (!def) throw new Error(`Unbekanntes Modul „${type}“`);
-		const node = await this.#node(def, def.voices);
+		const loaded = def.sampled && sample ? await this.loadSample(sample).catch(() => null) : null;
+		const node = await this.#node(def, def.voices, loaded);
 		if (id === undefined) for (let n = 1; this.modules.has((id = `${type}${n}`)); n++);
 		if (this.modules.has(id)) throw new Error(`Modul-ID „${id}“ gibt es schon`);
 		this.modules.set(id, this.#wire(def, id, node, def.voices));
+		this.modules.get(id).sample = loaded;
 		if (muted) this.setMuted(id, true, 0);
 		for (const [address, value] of Object.entries(params)) this.setParam(id, address, value);
 		this.onChange();
@@ -164,6 +170,12 @@ export class Rack {
 		this.modules.delete(id);
 		this.onRemove(id);
 		this.#resettle();
+		this.onChange();
+	}
+
+	// Gives a sampled module another sample. The module is built again around it.
+	async setSample(id, sample) {
+		await this.#rebuild(this.modules.get(id), this.modules.get(id).def, this.modules.get(id).voices, sample);
 		this.onChange();
 	}
 
@@ -200,13 +212,14 @@ export class Rack {
 
 	// Builds a module again, from another version of its program or with another number of
 	// voices, and puts back its knobs, its mute, its cables and its modulations.
-	async #rebuild(old, def, voices) {
-		const node = await this.#node(def, voices);
+	async #rebuild(old, def, voices, sample = old.sample) {
+		const node = await this.#node(def, voices, sample);
 		if (this.modules.get(old.id) !== old) return node[0].destroy();
 		const batch = this.batch;
 		this.batch = true;
 		try {
 			await this.#swap(old, def, voices, node);
+			this.modules.get(old.id).sample = sample;
 		} finally {
 			this.batch = batch;
 		}
@@ -442,6 +455,7 @@ export class Rack {
 			}
 			for (const [address, value] of Object.entries(m.params)) if (inst.params[address] !== value) this.setParam(m.id, address, value);
 			if (inst.muted !== m.muted) this.setMuted(m.id, m.muted);
+			if ((inst.sample?.name || undefined) !== m.sample) await this.setSample(m.id, m.sample ? await this.loadSample(m.sample).catch(() => null) : null);
 		}
 		this.modules = new Map(patch.modules.map((m) => [m.id, this.modules.get(m.id)]));
 		const same = (a, b) => a.from[0] === b.from[0] && a.from[1] === b.from[1] && a.to[0] === b.to[0] && a.to[1] === b.to[1];
@@ -459,7 +473,7 @@ export class Rack {
 	toJSON() {
 		return {
 			format: FORMAT,
-			modules: [...this.modules.values()].map(({ id, def, params, muted }) => ({ id, type: def.id, params, ...(muted && { muted }) })),
+			modules: [...this.modules.values()].map(({ id, def, params, muted, sample }) => ({ id, type: def.id, params, ...(muted && { muted }), ...(sample?.name && { sample: sample.name }) })),
 			cables: this.cables.map(({ from, to }) => ({ from, to })),
 			midi: [...this.midi].map(([cc, { id, address }]) => ({ cc, module: id, address })),
 			mods: this.mods.map(({ from, to, depth }) => ({ from, to, depth })),

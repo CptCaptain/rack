@@ -249,6 +249,31 @@ try {
 	await page.evaluate((patch) => window.faustRack.openPatch(patch), stored);
 	check((await mods()) === stillMod, "a patch with a modulation loads again");
 
+	// Sampler: plays the built-in bell, takes a file, and the patch remembers which.
+	{
+		await page.evaluate((patch) => window.faustRack.openPatch(patch), {
+			format: "faust-rack/1",
+			modules: [{ id: "clock1", type: "clock", params: {} }, { id: "sampler1", type: "sampler", params: {} }, { id: "output1", type: "output", params: {} }],
+			cables: [{ from: ["clock1", 0], to: ["sampler1", 1] }, { from: ["sampler1", 0], to: ["output1", 0] }],
+		});
+		await page.waitForTimeout(700);
+		const bell = await peak();
+		// Half a second of a 440 Hz sine as a WAV file, made here.
+		const tone = Buffer.alloc(44 + 22050 * 2);
+		tone.write("RIFF", 0); tone.writeUInt32LE(36 + 22050 * 2, 4); tone.write("WAVEfmt ", 8); tone.writeUInt32LE(16, 16); tone.writeUInt16LE(1, 20); tone.writeUInt16LE(1, 22);
+		tone.writeUInt32LE(44100, 24); tone.writeUInt32LE(88200, 28); tone.writeUInt16LE(2, 32); tone.writeUInt16LE(16, 34); tone.write("data", 36); tone.writeUInt32LE(22050 * 2, 40);
+		for (let i = 0; i < 22050; i++) tone.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * i) / 44100) * 20000), 44 + i * 2);
+		await page.setInputFiles(".sampler input", { name: "ton.wav", mimeType: "audio/wav", buffer: tone });
+		await page.waitForFunction(() => document.querySelector(".sampler span")?.textContent === "ton.wav");
+		await page.waitForTimeout(900);
+		const own = await peak();
+		const stored = await page.evaluate(() => window.faustRack.rack.toJSON().modules.find((m) => m.id === "sampler1").sample);
+		await page.reload();
+		await page.click("#start");
+		await page.waitForFunction(() => window.faustRack?.rack.modules.size, null, { timeout: 60_000 });
+		check(bell > 0.02 && own > 0.02 && stored === "ton.wav" && (await page.textContent(".sampler span")) === "ton.wav", `the sampler plays its bell (${bell.toFixed(3)}), then a loaded file (${own.toFixed(3)}), and still has the file after a reload`);
+	}
+
 	// Polyphony: a cable from the Poly Keyboard makes the modules behind it run once per voice.
 	{
 		await page.evaluate((patch) => window.faustRack.openPatch(patch), JSON.parse(readFileSync(`${dir}/patches/akkorde.json`, "utf8")));
@@ -273,6 +298,11 @@ try {
 		await page.click(".grid button >> nth=2");
 		const pattern = await page.evaluate(() => window.faustRack.rack.toJSON().modules.find((m) => m.id === "beat1").params["/beat/t1"]);
 		check(pattern === 4369 + 4 && (await page.locator(".grid button.on").count()) === 5 + 2 + 8 && (await page.locator(".grid button.now").count()) === 4, `a tap on the Beat grid adds a step to the pattern (${pattern}) and the running step is lit`);
+		await page.setViewportSize({ width: 390, height: 700 });
+		const cell = await page.locator(".grid button >> nth=0").boundingBox();
+		const wide = await page.evaluate(() => document.querySelector('.module[data-id="beat1"]').getBoundingClientRect().width);
+		await page.setViewportSize({ width: 1500, height: 900 });
+		check(cell.width >= 40 && cell.height >= 40 && wide <= 390, `on a phone a Beat cell is ${cell.width}x${cell.height} px and the module is ${Math.round(wide)} px wide`);
 	}
 
 	// Named patches and the share link.

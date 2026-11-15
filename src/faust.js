@@ -51,6 +51,8 @@ function parseControl(item) {
 			return { ...base, type: "toggle", min: 0, max: 1, init: 0 };
 		case "button":
 			return { ...base, type: "button" };
+		case "soundfile":
+			return { ...base, type: "soundfile", hidden: true };
 		case "hbargraph":
 		case "vbargraph":
 			return { ...base, type: meta.rack === "leds" ? "leds" : "meter", min: item.min, max: item.max };
@@ -90,6 +92,8 @@ export async function compile(compiler, id, info, code) {
 		microphone,
 		voices,
 		spreads,
+		// The module plays a sample that the page hands to it.
+		sampled: controls.some((c) => c.type === "soundfile"),
 		inputs,
 		outputs: parsePorts(id, speakers ? [] : info.outputs, speakers ? 0 : dsp.outputs / voices, "Ausgänge"),
 		controls,

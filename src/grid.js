@@ -8,18 +8,24 @@ export function grid(def, io) {
 	const el = document.createElement("div");
 	el.className = "grid";
 	const tracks = def.controls.filter((c) => /^t\d+$/.test(c.label)).map((c) => c.label);
-	const cells = tracks.map((label) =>
-		Array.from({ length: 16 }, (_, n) => {
+	const cells = tracks.map((label, track) => {
+		// One block per track. On a phone a block wraps into two rows of eight, so a cell is finger-sized.
+		const block = document.createElement("div");
+		block.className = "track";
+		block.dataset.track = track + 1;
+		el.append(block);
+		return Array.from({ length: 16 }, (_, n) => {
 			const cell = document.createElement("button");
+			cell.setAttribute("aria-label", `Spur ${track + 1}, Schritt ${n + 1}`);
 			cell.classList.toggle("on", bit(io.value(label), n) === 1);
 			cell.addEventListener("click", () => {
 				io.set(label, io.value(label) ^ (1 << n));
 				cell.classList.toggle("on");
 			});
-			el.append(cell);
+			block.append(cell);
 			return cell;
-		}),
-	);
+		});
+	});
 	let lit = -1;
 	io.onOutput("step", (value) => {
 		const now = Math.round(value);

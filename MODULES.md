@@ -123,6 +123,7 @@ Ein Widget ist JavaScript in `src/` und verbindet versteckte Regler eines Moduls
 | `life` | die versteckten Regler und Bargraphs aus `modules/life.dsp` | rechnet und zeichnet die Welt des Moduls Leben |
 | `grid` | versteckte Zahlen `t1`, `t2`, … (Bit n ist Schritt n) und Bargraph `step` | Raster mit 16 Schritten je Zahl |
 | `steps` | versteckte Zahlen `rests` und `holds` | ein Knopf je Sequencer-Schritt: spielen, Pause, halten |
+| `sampler` | `soundfile("sample[url:{'sample'}]", 1)` | lädt eine Audiodatei und übergibt sie dem Modul unter dem Namen `sample` |
 
 Ein neues Widget braucht eine Datei in `src/`, einen Eintrag in `WIDGETS` in `src/ui.js` und einen Build.
 
@@ -140,6 +141,8 @@ Ein Patch ist eine JSON-Datei. Beispiele liegen in `patches/`, `patches/index.js
 	"cables": [{ "from": ["vco1", 1], "to": ["output1", 0] }]
 }
 ```
+
+Ein Modul mit `"sample": "name.wav"` spielt die Aufnahme dieses Namens. Der Klang selbst liegt im Browser (IndexedDB), nicht im Patch. Fehlt er dort, spielt das Modul seine eingebaute Glocke.
 
 Ein Modul mit `"muted": true` ist stummgeschaltet: Es läuft, gibt aber an keiner Buchse etwas aus.
 

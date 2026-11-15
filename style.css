@@ -124,7 +124,8 @@ select { font: inherit; font-size: 11px; color: inherit; background: #111216; bo
 #picker .entry { display: flex; gap: 4px; margin-bottom: 4px; }
 #picker .entry > button:first-child { flex: 1; display: flex; flex-direction: column; text-align: left; border-left: 5px solid var(--color); }
 #picker .erase { min-width: 44px; }
-.grid { display: grid; grid-template-columns: repeat(16, 18px); gap: 3px 2px; padding: 0 8px; justify-content: center; }
+.grid { display: flex; flex-direction: column; gap: 4px; padding: 0 8px; }
+.grid .track { display: grid; grid-template-columns: repeat(16, 18px); gap: 2px; justify-content: center; }
 .grid button { min-height: 30px; min-width: 0; padding: 0; border-radius: 3px; }
 .grid button:nth-child(4n + 1) { margin-left: 3px; }
 .grid button.on { background: var(--color); border-color: var(--color); }
@@ -134,3 +135,11 @@ select { font: inherit; font-size: 11px; color: inherit; background: #111216; bo
 .module .voices { margin-right: 4px; padding: 0 5px; border-radius: 8px; background: var(--color); color: #000; font-size: 11px; font-weight: 700; }
 .cables .poly { stroke-width: 9; }
 .cables .poly.mod { stroke-width: 3; }
+@media (pointer: coarse), (max-width: 600px) {
+	.grid { gap: 10px; }
+	.grid .track { grid-template-columns: repeat(8, 40px); }
+	.grid button { min-height: 40px; }
+	.grid button:nth-child(4n + 1) { margin-left: 0; }
+}
+.sampler { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 0 8px; padding: 6px; border: 1px dashed var(--line); border-radius: 6px; font-size: 11px; text-align: center; }
+.sampler span { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
