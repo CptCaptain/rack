@@ -197,6 +197,8 @@ try {
 	await page.locator(".popover input").fill("-0.5");
 	check(/@-0.5/.test(await mods()) && (await page.locator(".cables .selected").count()) === 1, `tapping a modulation cable opens its strength slider: ${await mods()}`);
 	await page.click(".popover .row button");
+	// An AudioParam reports a new value only after the audio thread has taken it.
+	await page.waitForTimeout(150);
 	const stillMod = await mods();
 	check(stillMod === "lfo1:1>/vco/Fein@0.25" && (await page.evaluate(() => window.faustRack.rack.modules.get("vco1").node.getParamValue("/vco/Stimmung"))) === 0, `removing it leaves the other and puts the knob back: ${stillMod}`);
 	await page.click(jack("output1", "in", 0));
