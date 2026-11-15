@@ -6,6 +6,7 @@ import { openMidi } from "./midi.js";
 import { releaseMidiOut } from "./midiout.js";
 import { hitPad } from "./pads.js";
 import { Rack } from "./rack.js";
+import { MAX_RECORDING_MINUTES, startRecording } from "./record.js";
 import { RackView, h } from "./ui.js";
 
 const STORE = "faust-rack.patch";
@@ -213,10 +214,40 @@ $("btn-patches").addEventListener("click", async () => {
 		{ name: "Leeres Rack", description: "Alles entfernen und neu anfangen.", run: () => openPatch({ format: "faust-rack/1", modules: [], cables: [] }) },
 	]);
 });
-$("btn-export").addEventListener("click", () => {
-	const url = URL.createObjectURL(new Blob([JSON.stringify(rack, null, "\t")], { type: "application/json" }));
-	h("a", { href: url, download: "patch.json" }).click();
-	URL.revokeObjectURL(url);
+function download(blob, name) {
+	const url = URL.createObjectURL(blob);
+	h("a", { href: url, download: name }).click();
+	setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+$("btn-export").addEventListener("click", () => download(new Blob([JSON.stringify(rack, null, "\t")], { type: "application/json" }), "patch.json"));
+
+let recording = null;
+$("btn-record").addEventListener("click", async () => {
+	const button = $("btn-record");
+	if (!recording) {
+		const started = Date.now();
+		const tick = () => {
+			const seconds = Math.floor((Date.now() - started) / 1000);
+			button.textContent = `■ ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+			if (seconds >= MAX_RECORDING_MINUTES * 60) button.click();
+		};
+		recording = { stop: startRecording(rack.ctx, rack.analyser), timer: setInterval(tick, 500) };
+		button.setAttribute("aria-pressed", "true");
+		return tick();
+	}
+	const { stop, timer } = recording;
+	recording = null;
+	clearInterval(timer);
+	button.textContent = "Aufnahme";
+	button.setAttribute("aria-pressed", "false");
+	try {
+		const now = new Date();
+		const stamp = [now.getFullYear(), now.getMonth() + 1, now.getDate(), now.getHours(), now.getMinutes()].map((part) => String(part).padStart(2, "0")).join("-");
+		download(await stop(), `rack-${stamp}.wav`);
+	} catch (err) {
+		say(`Aufnahme fehlgeschlagen: ${err.message}`, true);
+	}
 });
 $("btn-import").addEventListener("click", () => $("file").click());
 $("file").addEventListener("change", async (e) => {

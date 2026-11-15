@@ -117,3 +117,4 @@ select { font: inherit; font-size: 11px; color: inherit; background: #111216; bo
 .display { display: block; width: calc(100% - 16px); height: 40px; margin: 0 8px 4px; border-radius: 6px; background: #0d0e11; }
 .jack i { position: relative; }
 .jack i::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; background: var(--kind); opacity: var(--lit, 0); }
+#btn-record[aria-pressed="true"] { background: #7a1f2e; border-color: var(--gate); }

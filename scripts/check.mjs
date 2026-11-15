@@ -242,6 +242,23 @@ try {
 	await page.evaluate((patch) => window.faustRack.openPatch(patch), stored);
 	check((await mods()) === stillMod, "a patch with a modulation loads again");
 
+	// Recording: the button records what plays and hands over a WAV file.
+	{
+		await page.evaluate((patch) => window.faustRack.openPatch(patch), first);
+		await page.waitForTimeout(300);
+		await page.click("#btn-record");
+		await page.waitForTimeout(1600);
+		const label = await page.textContent("#btn-record");
+		const [file] = await Promise.all([page.waitForEvent("download"), page.click("#btn-record")]);
+		const bytes = readFileSync(await file.path());
+		const [channels, rate, bits] = [bytes.readUInt16LE(22), bytes.readUInt32LE(24), bytes.readUInt16LE(34)];
+		const seconds = (bytes.length - 44) / (rate * channels * 2);
+		let loudest = 0;
+		for (let at = 44; at + 1 < bytes.length; at += 2) loudest = Math.max(loudest, Math.abs(bytes.readInt16LE(at)) / 32768);
+		check(/^■ 0:01$/.test(label) && bytes.toString("latin1", 0, 4) === "RIFF" && /\.wav$/.test(file.suggestedFilename()) && channels === 2 && bits === 16 && seconds > 1.2 && seconds < 2.6 && loudest > 0.02, `recording gives a WAV file: ${file.suggestedFilename()}, ${channels} channels, ${rate} Hz, ${seconds.toFixed(2)} s, peak ${loudest.toFixed(3)}`);
+		check((await page.textContent("#btn-record")) === "Aufnahme", "the record button goes back to idle");
+	}
+
 	// Live displays, on the first patch: clock, sequencer, VCO, ADSR, VCF, VCA, delay, output.
 	{
 		await page.evaluate((patch) => window.faustRack.openPatch(patch), first);
