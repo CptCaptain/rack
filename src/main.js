@@ -1,4 +1,6 @@
 import { valueFromMidi } from "./controls.js";
+import { edits } from "./edits.js";
+import { breed } from "./evolve.js";
 import { ModuleLibrary } from "./faust.js";
 import { keys } from "./keyboard.js";
 import { forgetWorld } from "./life.js";
@@ -7,6 +9,7 @@ import { releaseMidiOut } from "./midiout.js";
 import { hitPad } from "./pads.js";
 import { Rack } from "./rack.js";
 import { loadSample } from "./samples.js";
+import { forgetFeed } from "./web.js";
 import { MAX_RECORDING_MINUTES, startRecording } from "./record.js";
 import { RackView, h } from "./ui.js";
 
@@ -148,23 +151,73 @@ function reportFailures(failed) {
 	if (failed.length) say(`Fehler in Modul ${failed[0].id}: ${failed[0].message}`, true);
 }
 
+// Reads the modules again and swaps every changed one into the running rack.
+async function applyModules() {
+	const { changed, failed } = await modules.refresh();
+	reportFailures(failed);
+	if (!changed.length) return;
+	await serial(async () => {
+		for (const def of changed) await rack.update(def);
+		view.render();
+	});
+	say(`Modul neu geladen: ${changed.map((def) => def.name).join(", ")}`);
+}
+
 async function pollModules() {
-	if (document.visibilityState === "visible") {
-		try {
-			const { changed, failed } = await modules.refresh();
-			reportFailures(failed);
-			if (changed.length) {
-				await serial(async () => {
-					for (const def of changed) await rack.update(def);
-					view.render();
-				});
-				say(`Modul neu geladen: ${changed.map((def) => def.name).join(", ")}`);
-			}
-		} catch {
-			// The server was unreachable for a moment; the next round tries again.
-		}
-	}
+	// The server may be unreachable for a moment; the next round tries again.
+	if (document.visibilityState === "visible") await applyModules().catch(() => {});
 	setTimeout(pollModules, POLL_MS);
+}
+
+const TEMPLATE = {
+	dsp: `import("stdfaust.lib");\n\namount = hslider("[0]Menge", 0.5, 0, 1, 0.01) : si.smoo;\n\nprocess = *(amount);\n`,
+	json: `{\n\t"name": "Mein Modul",\n\t"description": "Was es tut.",\n\t"color": "#9bc53d",\n\t"group": "Eigene",\n\t"inputs": [{ "name": "In", "kind": "audio" }],\n\t"outputs": [{ "name": "Out", "kind": "audio" }]\n}\n`,
+};
+
+// The Editor: the Faust program and the description of one module, to change and hear at once.
+// Anwenden compiles here and swaps the module into the running rack. Nothing reaches the server.
+function editModule(id) {
+	const dialog = $("editor");
+	const source = edits.all()[id] ?? modules.defs.get(id)?.source ?? TEMPLATE;
+	$("editor-title").textContent = modules.defs.has(id) ? `Modul ${modules.defs.get(id).name} bearbeiten` : `Neues Modul „${id}“`;
+	$("editor-dsp").value = source.dsp;
+	$("editor-json").value = source.json;
+	$("editor-error").textContent = "";
+	$("editor-reset").hidden = !edits.all()[id];
+	$("editor-apply").onclick = async () => {
+		try {
+			JSON.parse($("editor-json").value);
+		} catch (err) {
+			return void ($("editor-error").textContent = `Die Beschreibung ist kein gültiges JSON: ${err.message}`);
+		}
+		edits.set(id, { dsp: $("editor-dsp").value, json: $("editor-json").value });
+		$("editor-reset").hidden = false;
+		await applyModules();
+		$("editor-error").textContent = modules.failures.get(id)?.message ?? "Läuft.";
+	};
+	$("editor-reset").onclick = async () => {
+		edits.remove(id);
+		dialog.close();
+		await applyModules();
+	};
+	$("editor-download").onclick = () => {
+		download(new Blob([$("editor-dsp").value], { type: "text/plain" }), `${id}.dsp`);
+		download(new Blob([$("editor-json").value], { type: "application/json" }), `${id}.json`);
+	};
+	dialog.showModal();
+}
+
+function openEditor() {
+	const create = () => {
+		const id = prompt("Kurzname für das neue Modul (Kleinbuchstaben und Ziffern):")?.trim().toLowerCase();
+		if (!id) return;
+		if (!/^[a-z][a-z0-9]*$/.test(id) || modules.defs.has(id)) return say("Der Name ist vergeben oder enthält andere Zeichen als Kleinbuchstaben und Ziffern.", true);
+		editModule(id);
+	};
+	pick("Modul-Editor", [
+		{ name: "Neues Modul …", description: "Ein eigenes Modul schreiben. Es lebt in diesem Browser.", run: create },
+		...[...modules.defs.values()].map((def) => ({ group: def.edited ? "Von dir geändert oder neu" : def.group, name: def.name, description: def.description, color: def.color, run: () => editModule(def.id) })).sort((a, b) => (a.group === "Von dir geändert oder neu" ? -1 : 0) - (b.group === "Von dir geändert oder neu" ? -1 : 0)),
+	]);
 }
 
 // Notes on channel 10 are drum pads, all other notes play the Keyboard modules.
@@ -185,7 +238,7 @@ function onMidi(event) {
 	const value = valueFromMidi(control, event.value);
 	if (value === null) return;
 	rack.setParam(bound.id, bound.address, value);
-	view.show(bound.id, bound.address, value);
+	view.showValue(bound.id, bound.address, value);
 }
 
 async function connectMidi() {
@@ -243,6 +296,7 @@ async function start() {
 		onRemove: (id) => {
 			releaseMidiOut(id);
 			forgetWorld(id);
+			forgetFeed(id);
 		},
 		onChange: () => {
 			clearTimeout(saveTimer);
@@ -266,7 +320,7 @@ async function start() {
 	setTimeout(pollModules, POLL_MS);
 	// Once allowed, MIDI comes back on its own; the first time needs the button because the browser asks.
 	navigator.permissions?.query({ name: "midi" }).then((permission) => permission.state === "granted" && connectMidi(), () => {});
-	window.faustRack = { rack, view, library: modules, openPatch, history, shareLink };
+	window.faustRack = { rack, view, library: modules, openPatch, history, shareLink, editModule };
 	$("start").textContent = "Weiter";
 	$("bar").inert = false;
 }
@@ -316,7 +370,61 @@ function download(blob, name) {
 	setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-$("btn-export").addEventListener("click", () => download(new Blob([JSON.stringify(rack, null, "\t")], { type: "application/json" }), "patch.json"));
+// Breeding: four children of the patch with nudged knobs to listen through. Nehmen makes the
+// one that plays the parent of four new ones. Listening does not fill the undo stack.
+const breeding = { parent: null, children: [] };
+async function audition(patch) {
+	await serial(async () => {
+		history.restoring = true;
+		try {
+			await rack.reconcile(patch);
+		} finally {
+			history.restoring = false;
+			view.render();
+		}
+	});
+}
+function litter() {
+	breeding.children = breed(breeding.parent, modules.defs, Number($("breed-strength").value));
+	for (const button of document.querySelectorAll("#breed [data-child]")) button.setAttribute("aria-pressed", "false");
+}
+function startBreeding() {
+	breeding.parent = rack.toJSON();
+	litter();
+	$("breed").hidden = false;
+}
+$("breed").addEventListener("click", async (e) => {
+	const button = e.target.closest("button");
+	if (!button) return;
+	const pressed = (which) => {
+		for (const other of document.querySelectorAll("#breed [data-child], #breed-parent")) other.setAttribute("aria-pressed", String(other === which));
+	};
+	if (button.dataset.child) {
+		pressed(button);
+		return audition(breeding.children[Number(button.dataset.child)]);
+	}
+	if (button.id === "breed-parent") {
+		pressed(button);
+		return audition(breeding.parent);
+	}
+	if (button.id === "breed-keep") {
+		breeding.parent = rack.toJSON();
+		litter();
+		return remember();
+	}
+	$("breed").hidden = true;
+	remember();
+});
+
+const exportPatch = () => download(new Blob([JSON.stringify(rack, null, "\t")], { type: "application/json" }), "patch.json");
+$("btn-more").addEventListener("click", () =>
+	pick("Mehr", [
+		{ name: "Züchten", description: "Vier Varianten des Patches mit verdrehten Reglern zum Durchhören. Die beste wird Elternteil der nächsten vier.", run: startBreeding },
+		{ name: "Modul-Editor", description: "Den Faust-Code eines Moduls ändern und sofort hören, oder ein eigenes Modul schreiben.", run: openEditor },
+		{ name: "Patch als Datei speichern", description: "Lädt den Patch als JSON-Datei herunter.", run: exportPatch },
+		{ name: "Patch aus Datei laden", description: "Öffnet eine JSON-Datei mit einem Patch.", run: () => $("file").click() },
+	]),
+);
 
 let recording = null;
 $("btn-record").addEventListener("click", async () => {
@@ -345,7 +453,6 @@ $("btn-record").addEventListener("click", async () => {
 		say(`Aufnahme fehlgeschlagen: ${err.message}`, true);
 	}
 });
-$("btn-import").addEventListener("click", () => $("file").click());
 $("file").addEventListener("change", async (e) => {
 	const [file] = e.target.files;
 	e.target.value = "";
@@ -357,6 +464,16 @@ $("file").addEventListener("change", async (e) => {
 	}
 });
 $("btn-save").addEventListener("click", () => savePatch());
+// Spielen cycles: rack -> play view. On the play view, Regler wählen goes to the rack to pick knobs, and Spielen comes back.
+const showView = (mode) => {
+	view.show(mode);
+	$("btn-play").setAttribute("aria-pressed", String(mode === "play"));
+	$("btn-play").textContent = mode === "pin" ? "Fertig" : "Spielen";
+	$("btn-pin").hidden = mode !== "play";
+	say(mode === "pin" ? "Tippe die Regler an, die auf die Spielfläche sollen. Ein Stern zeigt die gewählten. Dann „Fertig“." : "", mode === "pin");
+};
+$("btn-play").addEventListener("click", () => showView(view.staged ? "rack" : "play"));
+$("btn-pin").addEventListener("click", () => showView("pin"));
 $("btn-undo").addEventListener("click", undo);
 $("btn-redo").addEventListener("click", redo);
 addEventListener("keydown", (e) => {

@@ -1,0 +1,26 @@
+{
+  "name": "Web",
+  "group": "Steuerung",
+  "color": "#2ec4b6",
+  "widget": "web",
+  "columns": 1,
+  "description": "Holt eine Zahl aus dem Netz und macht daraus ein Steuersignal: das Wetter, einen Sensor, alles, was mit JSON antwortet. Voreingestellt ist die Temperatur in Berlin.",
+  "settings": {
+    "url": "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,wind_speed_10m",
+    "path": "current.temperature_2m",
+    "min": "-10",
+    "max": "35",
+    "every": "300"
+  },
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "0..1",
+      "kind": "cv"
+    },
+    {
+      "name": "-1..1",
+      "kind": "cv"
+    }
+  ]
+}

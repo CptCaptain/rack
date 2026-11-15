@@ -5,6 +5,7 @@ import {
 	instantiateFaustModuleFromFile,
 } from "../vendor/faustwasm/index.js";
 import { VERSION } from "../vendor/faustwasm/version.js";
+import { edits } from "./edits.js";
 import { table } from "./store.js";
 
 const PORT_KINDS = ["audio", "cv", "gate"];
@@ -120,6 +121,8 @@ export async function compile(getCompiler, id, info, code) {
 		columns: Number(info.columns) || 2,
 		widget: info.widget ?? null,
 		display: String(info.display ?? "scope"),
+		// Text settings of a module, with their defaults: what a widget needs beyond knobs.
+		settings: Object.fromEntries(Object.entries(info.settings ?? {}).map(([key, value]) => [key, String(value)])),
 		speakers,
 		microphone,
 		voices,
@@ -156,21 +159,24 @@ export class ModuleLibrary {
 	// fails keeps its last working version; a module dropped from index.json
 	// stays loaded until the page reloads, so a running patch never breaks.
 	async refresh(onProgress = () => {}) {
-		const ids = JSON.parse(await fetchText("modules/index.json"));
+		// Modules from the Editor come first in line: they replace a module of the same name
+		// and add the ones only this browser has.
+		const local = edits.all();
+		const ids = [...new Set([...JSON.parse(await fetchText("modules/index.json")), ...Object.keys(local)])];
 		const changed = [];
 		const failed = [];
 		for (const [i, id] of ids.entries()) {
 			onProgress(id, i, ids.length);
 			let signature;
 			try {
-				const [json, code] = await Promise.all([fetchText(`modules/${id}.json`), fetchText(`modules/${id}.dsp`)]);
+				const [json, code] = local[id] ? [local[id].json, local[id].dsp] : await Promise.all([fetchText(`modules/${id}.json`), fetchText(`modules/${id}.dsp`)]);
 				signature = `${json}\n${code}`;
 				if (this.defs.get(id)?.signature === signature) {
 					this.failures.delete(id);
 					continue;
 				}
 				if (this.failures.get(id)?.signature === signature) continue;
-				const def = { ...(await compile(this.compiler, id, JSON.parse(json), code)), signature };
+				const def = { ...(await compile(this.compiler, id, JSON.parse(json), code)), signature, source: { json, dsp: code }, edited: Boolean(local[id]) };
 				this.defs.set(id, def);
 				this.failures.delete(id);
 				changed.push(def);

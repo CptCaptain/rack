@@ -14,14 +14,15 @@
 	<button id="btn-patches">Patches</button>
 	<button id="btn-save" title="Speichert den Patch unter seinem Namen. Beim ersten Mal fragt er nach einem Namen.">Speichern</button>
 	<span id="patch-name" title="Name des Patches im Rack"></span>
-	<button id="btn-export">Export</button>
-	<button id="btn-import">Import</button>
 	<button id="btn-undo" aria-label="Rückgängig" title="Rückgängig (Strg+Z)">Zurück</button>
 	<button id="btn-redo" aria-label="Wiederholen" title="Wiederholen (Strg+Umschalt+Z)">Vor</button>
 	<button id="btn-record" aria-pressed="false" title="Nimmt auf, was das Rack spielt, und lädt es als WAV-Datei herunter">Aufnahme</button>
 	<button id="btn-power" aria-pressed="true">Ton</button>
 	<button id="btn-midi" aria-pressed="false">MIDI</button>
 	<button id="btn-learn" aria-pressed="false" disabled>Lernen</button>
+	<button id="btn-play" aria-pressed="false" title="Zeigt nur die gewählten Regler, groß, dazu Tasten, Pads und Raster">Spielen</button>
+	<button id="btn-pin" hidden>Regler wählen</button>
+	<button id="btn-more">Mehr</button>
 	<button id="btn-help" aria-label="Hilfe">?</button>
 	<canvas id="scope" width="140" height="32" title="So sieht der Klang am Ausgang aus"></canvas>
 	<span id="status" role="status"></span>
@@ -30,7 +31,33 @@
 
 <main id="rack"></main>
 
+<div id="breed" hidden>
+	<span>Züchten:</span>
+	<button id="breed-parent" aria-pressed="true">Eltern</button>
+	<button data-child="0" aria-pressed="false">A</button>
+	<button data-child="1" aria-pressed="false">B</button>
+	<button data-child="2" aria-pressed="false">C</button>
+	<button data-child="3" aria-pressed="false">D</button>
+	<label>Wildheit <input id="breed-strength" type="range" min="0.02" max="0.5" step="0.01" value="0.15"></label>
+	<button id="breed-keep" title="Was gerade klingt, wird Elternteil von vier neuen Varianten">Nehmen</button>
+	<button id="breed-done">Fertig</button>
+</div>
+
 <dialog id="picker"></dialog>
+
+<dialog id="editor">
+	<h2 id="editor-title"></h2>
+	<p>Das Faust-Programm ist der Klang, die Beschreibung nennt Name und Buchsen. „Anwenden“ tauscht das Modul im laufenden Rack. Die Änderung bleibt in diesem Browser.</p>
+	<label>Faust-Programm<textarea id="editor-dsp" rows="14" spellcheck="false"></textarea></label>
+	<label>Beschreibung (JSON)<textarea id="editor-json" rows="7" spellcheck="false"></textarea></label>
+	<pre id="editor-error" role="status"></pre>
+	<form method="dialog">
+		<button type="button" id="editor-reset">Zurücksetzen</button>
+		<button type="button" id="editor-download">Herunterladen</button>
+		<button type="button" id="editor-apply">Anwenden</button>
+		<button>Schließen</button>
+	</form>
+</dialog>
 
 <dialog id="help">
 	<h2>Faust Rack</h2>
@@ -54,6 +81,9 @@
 		<li><b>Rhythmen:</b> Im Modul Beat Kästchen antippen. Im Sequencer macht der Knopf unter einem Schritt daraus eine Pause (–) oder hält den Ton davor (~).</li>
 		<li><b>Rückgängig:</b> „Zurück“ oder Strg+Z nimmt den letzten Schritt zurück, „Vor“ oder Strg+Umschalt+Z holt ihn wieder. Der Klang läuft dabei weiter.</li>
 		<li><b>Aufnehmen:</b> „Aufnahme“ startet, ein zweiter Druck stoppt und lädt eine WAV-Datei herunter.</li>
+		<li><b>Spielen:</b> „Spielen“ zeigt nur die Regler, die du gewählt hast, groß und fingerfreundlich, dazu Tasten, Pads und Raster. „Regler wählen“ bestimmt, welche.</li>
+		<li><b>Züchten:</b> Unter „Mehr“ macht Züchten vier Varianten deines Patches. Durchhören, die beste mit „Nehmen“ behalten, weiterzüchten.</li>
+		<li><b>Module ändern:</b> Unter „Mehr“ öffnet der Modul-Editor den Faust-Code eines Moduls. Ändern, „Anwenden“, sofort hören. Dort entstehen auch eigene Module.</li>
 		<li><b>Kein Ton?</b> Führt ein Kabel bis in den Output? Ist „Ton“ oben an und Volume aufgedreht?</li>
 	</ul>
 	<p>Der Patch wird im Browser gespeichert. „Speichern“ legt ihn zusätzlich unter einem Namen ab, so kannst du beliebig viele Patches behalten. Unter „Patches“ findest du sie wieder, neben den Beispielen und dem Link zum Teilen.</p>

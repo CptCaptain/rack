@@ -17,7 +17,8 @@ export function parsePatch(data, defs) {
 			throw new Error(`Ungültige oder doppelte Modul-ID: ${m?.id}`);
 		if (!defs.has(m.type)) throw new Error(`Unbekanntes Modul „${m.type}“`);
 		types.set(m.id, defs.get(m.type));
-		return { id: m.id, type: m.type, params: { ...m.params }, muted: m.muted === true, sample: typeof m.sample === "string" ? m.sample : undefined };
+		const settings = Object.fromEntries(Object.entries(m.settings ?? {}).filter(([key]) => key in defs.get(m.type).settings).map(([key, value]) => [key, String(value)]));
+		return { id: m.id, type: m.type, params: { ...m.params }, muted: m.muted === true, sample: typeof m.sample === "string" ? m.sample : undefined, settings };
 	});
 	const cables = data.cables.map((c) => {
 		if (!isRef(c?.from) || !isRef(c?.to)) throw new Error("Kabel brauchen from und to als [Modul-ID, Buchsen-Nummer]");
@@ -30,13 +31,15 @@ export function parsePatch(data, defs) {
 			throw new Error(`MIDI-Zuordnung zeigt auf einen Regler, den es nicht gibt: ${m?.module} ${m?.address}`);
 		return { cc: m.cc, module: m.module, address: m.address };
 	});
+	// The knobs picked for the play view, as [module, address].
+	const stage = (data.stage ?? []).filter((s) => Array.isArray(s) && types.get(s[0])?.controls.some((c) => c.address === s[1] && !c.hidden)).map((s) => [s[0], s[1]]);
 	const mods = (data.mods ?? []).map((m) => {
 		const control = isRef(m?.from) && Array.isArray(m.to) && types.get(m.to[0])?.controls.find((c) => c.address === m.to[1]);
 		if (!control || control.hidden || !travel(control) || !types.get(m.from[0])?.outputs[m.from[1]] || !(Math.abs(m.depth) <= 1))
 			throw new Error(`Modulation ${m?.from?.join(":")} → ${m?.to?.join(" ")} passt nicht zum Patch`);
 		return { from: [...m.from], to: [...m.to], depth: m.depth };
 	});
-	return { modules, cables, midi, mods };
+	return { modules, cables, midi, mods, stage };
 }
 
 export class Rack {
@@ -60,6 +63,8 @@ export class Rack {
 		// A modulation moves a knob with a signal: { from: [id, port], to: [id, address], depth, tap, signal }.
 		// depth is the share of the knob's travel that a signal of 1 moves it.
 		this.mods = [];
+		// The knobs picked for the play view, as [module, address], in the order they were picked.
+		this.stage = [];
 		// MIDI controller number -> the one control it moves.
 		this.midi = new Map();
 		this.analyser = new AnalyserNode(ctx, { fftSize: 2048 });
@@ -145,7 +150,7 @@ export class Rack {
 		inst.node.destroy();
 	}
 
-	async add(type, { id, params = {}, muted = false, sample } = {}) {
+	async add(type, { id, params = {}, muted = false, sample, settings = {} } = {}) {
 		const def = this.defs.get(type);
 		if (!def) throw new Error(`Unbekanntes Modul „${type}“`);
 		const loaded = def.sampled && sample ? await this.loadSample(sample).catch(() => null) : null;
@@ -154,6 +159,7 @@ export class Rack {
 		if (this.modules.has(id)) throw new Error(`Modul-ID „${id}“ gibt es schon`);
 		this.modules.set(id, this.#wire(def, id, node, def.voices));
 		this.modules.get(id).sample = loaded;
+		this.modules.get(id).settings = { ...settings };
 		if (muted) this.setMuted(id, true, 0);
 		for (const [address, value] of Object.entries(params)) this.setParam(id, address, value);
 		this.onChange();
@@ -166,6 +172,7 @@ export class Rack {
 		for (const cable of this.#cablesOf(id)) this.disconnect(cable);
 		for (const mod of this.#modsOf(id)) this.unmodulate(mod);
 		this.unlearn(id);
+		this.stage = this.stage.filter(([module]) => module !== id);
 		this.#unwire(inst);
 		this.modules.delete(id);
 		this.onRemove(id);
@@ -220,6 +227,7 @@ export class Rack {
 		try {
 			await this.#swap(old, def, voices, node);
 			this.modules.get(old.id).sample = sample;
+			this.modules.get(old.id).settings = old.settings;
 		} finally {
 			this.batch = batch;
 		}
@@ -393,6 +401,18 @@ export class Rack {
 		this.onChange();
 	}
 
+	// Puts a control on the play view, or takes it off again.
+	pin(id, address) {
+		const at = this.stage.findIndex(([module, control]) => module === id && control === address);
+		at < 0 ? this.stage.push([id, address]) : this.stage.splice(at, 1);
+		this.onChange();
+	}
+
+	setSetting(id, key, value) {
+		this.modules.get(id).settings[key] = value;
+		this.onChange();
+	}
+
 	learn(cc, id, address) {
 		this.unlearn(id, address);
 		this.midi.set(cc, { id, address });
@@ -422,6 +442,7 @@ export class Rack {
 			for (const c of patch.cables) this.connect(c.from, c.to);
 			for (const m of patch.midi) this.learn(m.cc, m.module, m.address);
 			for (const m of patch.mods) await this.modulate(m.from, m.to, m.depth);
+			this.stage = patch.stage;
 		} finally {
 			this.batch = false;
 		}
@@ -468,15 +489,19 @@ export class Rack {
 		}
 		this.midi.clear();
 		for (const m of patch.midi) this.learn(m.cc, m.module, m.address);
+		this.stage = patch.stage;
+		for (const m of patch.modules) this.modules.get(m.id).settings = { ...m.settings };
 	}
 
+	// A copy: changing the rack afterwards does not change a patch that was taken before.
 	toJSON() {
 		return {
 			format: FORMAT,
-			modules: [...this.modules.values()].map(({ id, def, params, muted, sample }) => ({ id, type: def.id, params, ...(muted && { muted }), ...(sample?.name && { sample: sample.name }) })),
-			cables: this.cables.map(({ from, to }) => ({ from, to })),
+			modules: [...this.modules.values()].map(({ id, def, params, muted, sample, settings }) => ({ id, type: def.id, params: { ...params }, ...(muted && { muted }), ...(sample?.name && { sample: sample.name }), ...(Object.keys(settings).length && { settings: { ...settings } }) })),
+			cables: this.cables.map(({ from, to }) => ({ from: [...from], to: [...to] })),
 			midi: [...this.midi].map(([cc, { id, address }]) => ({ cc, module: id, address })),
-			mods: this.mods.map(({ from, to, depth }) => ({ from, to, depth })),
+			mods: this.mods.map(({ from, to, depth }) => ({ from: [...from], to: [...to], depth })),
+			stage: this.stage.map((pin) => [...pin]),
 		};
 	}
 }

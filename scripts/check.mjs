@@ -258,6 +258,77 @@ try {
 	await page.evaluate((patch) => window.faustRack.openPatch(patch), stored);
 	check((await mods()) === stillMod, "a patch with a modulation loads again");
 
+	// The play view, breeding and the Web module, on the first patch.
+	{
+		await page.route("**/wetter-test", (route) => route.fulfill({ json: { current: { temperature_2m: 12.5 } } }));
+		await page.evaluate((patch) => window.faustRack.openPatch(patch), { ...first, modules: [...first.modules, { id: "web1", type: "web", params: {}, settings: { url: "/wetter-test", min: "0", max: "25" } }] });
+		await page.waitForTimeout(700);
+		const fetched = await page.evaluate(() => ({ shown: document.querySelector(".web output").textContent, value: window.faustRack.rack.modules.get("web1").node.getParamValue("/web/value") }));
+		check(fetched.shown === "12.5" && Math.abs(fetched.value - 0.5) < 0.001, `the Web module fetches a number and scales it: ${fetched.shown} becomes ${fetched.value}`);
+
+		await page.click("#btn-play");
+		await page.click("#btn-pin");
+		await page.click('.module[data-id="vcf1"] .control[data-address="/vcf/Cutoff"] .dial');
+		await page.click('.module[data-id="clock1"] .control[data-address="/clock/Tempo"] .dial');
+		await page.click("#btn-play");
+		const big = await page.locator(".stage .picked .dial >> nth=0").boundingBox();
+		const dial = await center(".stage .picked .dial >> nth=0");
+		await drag(dial, [dial[0], dial[1] - 80]);
+		const stage = await page.evaluate(() => ({ knobs: document.querySelectorAll(".stage .picked .control").length, panels: document.querySelectorAll(".modules > .module").length, cutoff: window.faustRack.rack.modules.get("vcf1").params["/vcf/Cutoff"], stored: window.faustRack.rack.toJSON().stage.length }));
+		await page.click("#btn-play");
+		check(stage.knobs === 2 && stage.panels === 0 && stage.stored === 2 && stage.cutoff > 500 && big.width >= 80 && (await page.locator(".modules > .module").count()) === first.modules.length + 1, `the play view shows the 2 picked knobs at ${big.width} px, turning one moves the real knob (Cutoff ${stage.cutoff}), and the rack comes back`);
+
+		await page.click("#btn-more");
+		await page.click('#picker button:has-text("Züchten")');
+		// Knob values by address, sorted, so two equal settings compare equal whatever order they were set in.
+		const knobs = () => page.evaluate(() => JSON.stringify(window.faustRack.rack.toJSON().modules.map((m) => Object.entries(m.params).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)))));
+		const parent = await knobs();
+		const volume = () => page.evaluate(() => window.faustRack.rack.modules.get("output1").node.getParamValue("/output/Volume"));
+		const quiet = await volume();
+		await page.click('#breed [data-child="1"]');
+		await page.waitForTimeout(300);
+		const child = await knobs();
+		await page.click("#breed-parent");
+		await page.waitForTimeout(300);
+		const back = await knobs();
+		await page.click('#breed [data-child="2"]');
+		await page.click("#breed-keep");
+		await page.click("#breed-done");
+		const kept = await knobs();
+		const loud = await volume();
+		check(child !== parent && back === parent && loud === quiet && kept !== parent && (await page.locator("#breed").isHidden()), `breeding offers children with other knob settings, goes back to the parent, keeps one, and leaves the volume alone (${child !== parent} ${back === parent} ${loud} ${quiet} ${kept !== parent})`);
+	}
+
+	// The Editor: change a module's program and it is swapped into the running rack. A new module works too.
+	{
+		await page.evaluate((patch) => window.faustRack.openPatch(patch), { format: "faust-rack/1", modules: [{ id: "vca1", type: "vca", params: {} }], cables: [] });
+		await page.click("#btn-more");
+		await page.click('#picker button:has-text("Modul-Editor")');
+		const noiseFrom = consoleProblems.length;
+		await page.click('#picker button:has(b:text-is("VCA"))');
+		const code = await page.inputValue("#editor-dsp");
+		await page.fill("#editor-dsp", code.replace('"[0]Pegel"', '"[0]Lautheit"'));
+		await page.click("#editor-apply");
+		await page.waitForFunction(() => document.getElementById("editor-error").textContent === "Läuft.");
+		const renamed = await page.locator('.module[data-id="vca1"] .control span:has-text("Lautheit")').count();
+		await page.fill("#editor-dsp", "process = kaputt;");
+		await page.click("#editor-apply");
+		await page.waitForFunction(() => /kaputt/.test(document.getElementById("editor-error").textContent));
+		const stillRuns = await page.locator('.module[data-id="vca1"] .control span:has-text("Lautheit")').count();
+		await page.click("#editor-reset");
+		await page.waitForFunction(() => document.querySelector('.module[data-id="vca1"] .control span')?.textContent === "Pegel");
+		page.once("dialog", (dialog) => dialog.accept("eigenes"));
+		await page.click("#btn-more");
+		await page.click('#picker button:has-text("Modul-Editor")');
+		await page.click('#picker button:has-text("Neues Modul")');
+		await page.click("#editor-apply");
+		await page.waitForFunction(() => window.faustRack.library.defs.has("eigenes"));
+		await page.click("#editor-reset");
+		// The broken program on purpose wrote to the console. Those lines are not a fault.
+		consoleProblems.splice(noiseFrom);
+		check(renamed === 1 && stillRuns === 1, "the Editor swaps a changed module into the rack, shows a Faust error while the old version keeps running, resets, and makes a new module");
+	}
+
 	// Every module in the menu can be put into a rack, with its panel and display.
 	{
 		await page.evaluate(() => window.faustRack.openPatch({ format: "faust-rack/1", modules: [], cables: [] }));

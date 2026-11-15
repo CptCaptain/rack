@@ -145,3 +145,28 @@ select { font: inherit; font-size: 11px; color: inherit; background: #111216; bo
 .sampler span { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #patch-name { color: var(--dim); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #patch-name:empty { display: none; }
+#editor { width: min(760px, 96vw); }
+#editor label { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; color: var(--dim); font-size: 12px; }
+#editor textarea { font: 12px/1.4 ui-monospace, monospace; color: var(--text); background: #0d0e11; border: 1px solid var(--line); border-radius: 6px; padding: 8px; tab-size: 2; resize: vertical; }
+#editor-error { min-height: 1.4em; margin: 8px 0 0; white-space: pre-wrap; color: var(--audio); font-size: 12px; }
+#breed { position: fixed; z-index: 4; left: 50%; bottom: 12px; translate: -50%; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; width: min(640px, 96vw); padding: 8px 10px; background: var(--panel); border: 1px solid var(--text); border-radius: 10px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.5); }
+#breed[hidden] { display: none; }
+#breed [data-child] { min-width: 44px; }
+#breed label { display: flex; align-items: center; gap: 6px; color: var(--dim); }
+.stage { width: 100%; }
+.stage .picked { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 14px 8px; padding: 12px 4px; }
+.stage .control { font-size: 14px; }
+.stage .control small, .played small { color: var(--color); font-weight: 700; margin-bottom: 4px; }
+.stage .control output { font-size: 13px; }
+.stage .dial { width: 88px; height: 88px; border-width: 4px; }
+.stage .dial::after { top: 6px; width: 5px; height: 28px; margin-left: -2.5px; }
+.stage .toggle, .stage select { min-height: 56px; min-width: 88px; font-size: 14px; }
+.stage .dial[data-mod]::before { display: none; }
+.played { min-height: 0; margin: 10px 0; padding: 8px 0 10px; }
+.played small { padding: 0 10px; }
+.pinning .control[data-address] { outline: 1px dashed var(--dim); outline-offset: 1px; border-radius: 6px; cursor: pointer; }
+.pinning .control[data-pinned]::after { content: "*"; position: absolute; top: -8px; left: 2px; color: var(--audio); font-size: 20px; font-weight: 700; }
+.web { display: flex; flex-direction: column; gap: 3px; margin: 0 8px; font-size: 10px; color: var(--dim); }
+.web label { display: flex; flex-direction: column; }
+.web input { font: inherit; font-size: 11px; color: var(--text); background: #0d0e11; border: 1px solid var(--line); border-radius: 4px; padding: 4px; width: 170px; }
+.web output { color: var(--text); font-size: 12px; text-align: center; }

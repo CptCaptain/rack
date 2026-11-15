@@ -6,10 +6,13 @@ import { life } from "./life.js";
 import { midiout } from "./midiout.js";
 import { pads } from "./pads.js";
 import { sampler } from "./sampler.js";
+import { web } from "./web.js";
 import { importSample } from "./samples.js";
 
 // A widget gets the module definition and { id, poke, set, value, onOutput, muted }, keyed by control label where they name a control.
-const WIDGETS = { keyboard, pads, midiout, life, grid, steps, sampler };
+const WIDGETS = { keyboard, pads, midiout, life, grid, steps, sampler, web };
+// Widgets that are played, and so belong on the play view with the picked knobs.
+const PLAYED = ["keyboard", "pads", "grid"];
 const SVG = "http://www.w3.org/2000/svg";
 // While a cable is dragged this close to the rack's edge, the rack scrolls.
 const EDGE = 50;
@@ -172,6 +175,8 @@ export class RackView {
 		// MIDI learn: while learning, a tap picks the control that the next controller move binds.
 		this.learning = false;
 		this.learnTarget = null;
+		this.staged = false;
+		this.pinning = false;
 		rack.onOutput = (id, address, value) => this.outputs.get(`${id} ${address}`)?.(value);
 		new ResizeObserver(() => this.draw()).observe(this.modulesEl);
 		this.modulesEl.addEventListener("pointerdown", (e) => this.#pressJack(e));
@@ -186,7 +191,7 @@ export class RackView {
 		this.render();
 	}
 
-	show(id, address, value) {
+	showValue(id, address, value) {
 		this.values.get(`${id} ${address}`)?.(value);
 	}
 
@@ -196,6 +201,13 @@ export class RackView {
 	}
 
 	#pickLearnTarget(e) {
+		const pinned = this.pinning && e.target.closest(".control[data-address]");
+		if (pinned) {
+			e.stopPropagation();
+			e.preventDefault();
+			this.rack.pin(pinned.closest(".module").dataset.id, pinned.dataset.address);
+			return pinned.toggleAttribute("data-pinned");
+		}
 		const target = this.#controlAt(e);
 		if (!target) return;
 		this.learnTarget = target;
@@ -216,14 +228,27 @@ export class RackView {
 		this.modulated.clear();
 		this.box = null;
 		this.root.classList.toggle("learning", this.learning);
-		this.modulesEl.replaceChildren(...[...this.rack.modules.values()].map((inst) => this.#panel(inst)));
-		this.displays.reset(this.modulesEl.children);
+		this.root.classList.toggle("pinning", this.pinning);
+		this.root.classList.toggle("staged", this.staged);
+		this.modulesEl.replaceChildren(...(this.staged ? [this.#stage()] : [...this.rack.modules.values()].map((inst) => this.#panel(inst))));
+		this.displays.reset(this.staged ? [] : this.modulesEl.children);
 		this.draw();
 	}
 
-	#panel(inst) {
+	// "play" shows the play view, "pin" shows the rack with a tap picking knobs for it, "rack" is the rack as usual.
+	show(mode) {
+		this.staged = mode === "play";
+		this.pinning = mode === "pin";
+		// A held cable is put away here without drawing: the jacks it would be drawn to are about to be replaced.
+		this.held = null;
+		clearTimeout(this.holdTimer);
+		this.render();
+	}
+
+	// What a control and a widget of this module need to read and write.
+	#io(inst) {
 		const { def, id } = inst;
-		const io = (c) => ({
+		const control = (c) => ({
 			value: inst.params[c.address] ?? c.init,
 			set: (v) => this.rack.setParam(id, c.address, v),
 			poke: (v) => this.rack.poke(id, c.address, v),
@@ -231,6 +256,55 @@ export class RackView {
 			onValue: (fn) => this.values.set(`${id} ${c.address}`, fn),
 			onModulated: (fn) => this.modulated.set(`${id} ${c.address}`, fn),
 		});
+		const address = (label) => def.controls.find((c) => c.label === label)?.address;
+		const widget = {
+			id,
+			poke: (label, value) => address(label) && this.rack.poke(id, address(label), value),
+			// Like a knob: the value is part of the patch.
+			set: (label, value) => this.rack.setParam(id, address(label), value),
+			value: (label) => this.rack.modules.get(id).params[address(label)] ?? def.controls.find((c) => c.label === label).init,
+			onOutput: (label, fn) => this.outputs.set(`${id} ${address(label)}`, fn),
+			muted: () => this.rack.modules.get(id).muted,
+			settings: () => ({ ...def.settings, ...this.rack.modules.get(id).settings }),
+			setSetting: (key, value) => this.rack.setSetting(id, key, value),
+			sample: () => this.rack.modules.get(id).sample?.name,
+			loadSample: async (file) => {
+				await this.rack.setSample(id, await importSample(this.rack.ctx, file));
+				this.render();
+			},
+		};
+		return { control, widget };
+	}
+
+	#controlEl(inst, c, io) {
+		const el = CONTROLS[c.type](c, io.control(c));
+		el.dataset.address = c.address;
+		const cc = this.rack.ccOf(inst.id, c.address);
+		if (cc !== undefined) el.dataset.cc = cc;
+		if (this.rack.stage.some(([module, address]) => module === inst.id && address === c.address)) el.dataset.pinned = "";
+		return el;
+	}
+
+	// The play view: only the knobs that were picked, large, and the keys, pads and grids of the patch.
+	#stage() {
+		const picked = this.rack.stage.map(([id, address]) => {
+			const inst = this.rack.modules.get(id);
+			const el = this.#controlEl(inst, inst.def.controls.find((c) => c.address === address), this.#io(inst));
+			el.prepend(h("small", {}, inst.def.name));
+			el.style.setProperty("--color", inst.def.color);
+			return el;
+		});
+		const played = [...this.rack.modules.values()].filter((inst) => PLAYED.includes(inst.def.widget)).map((inst) => {
+			const box = h("div", { class: "played module", "data-id": inst.id, style: `--color:${inst.def.color};--cols:${inst.def.columns}` }, h("small", {}, inst.def.name), WIDGETS[inst.def.widget](inst.def, this.#io(inst).widget));
+			return box;
+		});
+		const hint = picked.length ? [] : [h("p", {}, "Noch kein Regler gewählt. „Regler wählen“ drücken und im Rack die Regler antippen, die hier stehen sollen.")];
+		return h("div", { class: "stage" }, h("div", { class: "picked" }, ...picked), ...hint, ...played);
+	}
+
+	#panel(inst) {
+		const { def, id } = inst;
+		const io = this.#io(inst);
 		const close = h("button", { class: "close", title: "Modul entfernen", "aria-label": `${def.name} entfernen` }, "×");
 		close.addEventListener("click", () => {
 			this.rack.remove(id);
@@ -253,30 +327,8 @@ export class RackView {
 			});
 			return button;
 		};
-		const controls = def.controls
-			.filter((c) => !c.hidden)
-			.map((c) => {
-				const el = CONTROLS[c.type](c, io(c));
-				el.dataset.address = c.address;
-				const cc = this.rack.ccOf(id, c.address);
-				if (cc !== undefined) el.dataset.cc = cc;
-				return el;
-			});
-		const address = (label) => def.controls.find((c) => c.label === label)?.address;
-		const widget = WIDGETS[def.widget]?.(def, {
-			id,
-			poke: (label, value) => address(label) && this.rack.poke(id, address(label), value),
-			// Like a knob: the value is part of the patch.
-			set: (label, value) => this.rack.setParam(id, address(label), value),
-			value: (label) => this.rack.modules.get(id).params[address(label)] ?? def.controls.find((c) => c.label === label).init,
-			onOutput: (label, fn) => this.outputs.set(`${id} ${address(label)}`, fn),
-			muted: () => this.rack.modules.get(id).muted,
-			sample: () => this.rack.modules.get(id).sample?.name,
-			loadSample: async (file) => {
-				await this.rack.setSample(id, await importSample(this.rack.ctx, file));
-				this.render();
-			},
-		});
+		const controls = def.controls.filter((c) => !c.hidden).map((c) => this.#controlEl(inst, c, io));
+		const widget = WIDGETS[def.widget]?.(def, io.widget);
 		const jack = (dir) => (port, index) =>
 			h("div", { class: `jack ${port.kind}`, "data-module": id, "data-dir": dir, "data-port": index }, h("i"), h("span", {}, port.name));
 		return h(
@@ -308,11 +360,12 @@ export class RackView {
 		return this.#centerOf(this.#jackEl(ref));
 	}
 
-	#controlEl([id, address]) {
+	#placedControl([id, address]) {
 		return this.modulesEl.querySelector(`.module[data-id="${id}"] .control[data-address="${address}"]`);
 	}
 
 	draw(loose) {
+		if (this.staged) return this.svg.replaceChildren();
 		this.svg.setAttribute("width", this.modulesEl.offsetWidth);
 		this.svg.setAttribute("height", this.modulesEl.offsetHeight);
 		const path = ([x1, y1], [x2, y2], kind) => {
@@ -327,7 +380,7 @@ export class RackView {
 		const kindOfLive = (from) => `${kindOf(from)}${this.rack.modules.get(from[0]).muted ? " muted" : ""}${this.rack.modules.get(from[0]).voices > 1 ? " poly" : ""}`;
 		this.paths = [
 			...this.rack.cables.map((cable) => ({ item: cable, el: path(start(cable.from), this.#center({ id: cable.to[0], dir: "in", port: cable.to[1] }), kindOfLive(cable.from)) })),
-			...this.rack.mods.map((mod) => ({ item: mod, el: path(start(mod.from), this.#centerOf(this.#controlEl(mod.to).firstChild), `${kindOfLive(mod.from)} mod`) })),
+			...this.rack.mods.map((mod) => ({ item: mod, el: path(start(mod.from), this.#centerOf(this.#placedControl(mod.to).firstChild), `${kindOfLive(mod.from)} mod`) })),
 		];
 		if (this.box) {
 			const before = this.box.items.length;

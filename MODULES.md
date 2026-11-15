@@ -59,6 +59,7 @@ Trage danach `"ringmod"` in `modules/index.json` ein.
 | `display` | nein | Die Live-Anzeige im Modul. Vorgabe ist `"scope"`: der erste Audio-Ausgang als Welle, sonst der erste Ausgang als Verlauf der letzten drei Sekunden. `"adsr"` zeichnet die Hüllkurve mit laufendem Punkt und braucht die Regler Attack, Decay, Sustain, Release. `"filter"` zeichnet die Filterkurve und braucht Cutoff, Resonanz, CV-Anteil. `"none"` zeigt nichts. |
 | `voices` | nein | `4` macht das Modul von sich aus vierstimmig. `process` hat dann jede Buchse viermal, Stimme für Stimme, die JSON-Datei nennt sie einmal. `modules/polykeys.dsp` zeigt es. |
 | `mono` | nein | `true` hält das Modul einstimmig, auch hinter einem mehrstimmigen Modul. Die Stimmen addieren sich dann am Eingang. Sinnvoll für Hall und Echo. |
+| `settings` | nein | Texteinstellungen des Moduls mit ihren Vorgaben, etwa eine Adresse. Ein Widget liest und ändert sie, der Patch speichert Abweichungen. |
 | `widget` | nein | Zusätzliches Bedienfeld: `"keyboard"`, `"pads"`, `"midiout"` oder `"life"`. |
 
 Eine Buchse hat `name` und `kind`. `kind` ist `audio`, `cv` oder `gate` und bestimmt nur die Farbe. Jede Buchse lässt sich mit jeder verbinden.
@@ -123,6 +124,7 @@ Ein Widget ist JavaScript in `src/` und verbindet versteckte Regler eines Moduls
 | `life` | die versteckten Regler und Bargraphs aus `modules/life.dsp` | rechnet und zeichnet die Welt des Moduls Leben |
 | `grid` | versteckte Zahlen `t1`, `t2`, … (Bit n ist Schritt n) und Bargraph `step` | Raster mit 16 Schritten je Zahl |
 | `steps` | versteckte Zahlen `rests` und `holds` | ein Knopf je Sequencer-Schritt: spielen, Pause, halten |
+| `web` | versteckter Regler `value` und `settings` in der JSON-Datei | holt regelmäßig eine Zahl von einer Adresse im Netz |
 | `sampler` | `soundfile("sample[url:{'sample'}]", 1)` | lädt eine Audiodatei und übergibt sie dem Modul unter dem Namen `sample` |
 
 Ein neues Widget braucht eine Datei in `src/`, einen Eintrag in `WIDGETS` in `src/ui.js` und einen Build.
@@ -143,6 +145,8 @@ Ein Patch ist eine JSON-Datei. Beispiele liegen in `patches/`, `patches/index.js
 ```
 
 Ein Modul mit `"sample": "name.wav"` spielt die Aufnahme dieses Namens. Der Klang selbst liegt im Browser (IndexedDB), nicht im Patch. Fehlt er dort, spielt das Modul seine eingebaute Glocke.
+
+`"stage": [["vcf1", "/vcf/Cutoff"]]` nennt die Regler der Spielansicht.
 
 Ein Modul mit `"muted": true` ist stummgeschaltet: Es läuft, gibt aber an keiner Buchse etwas aus.
 
