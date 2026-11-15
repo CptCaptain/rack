@@ -19,7 +19,12 @@ export function parsePatch(data, defs) {
 			throw new Error(`Kabel ${c.from.join(":")} → ${c.to.join(":")} zeigt auf eine Buchse, die es nicht gibt`);
 		return { from: [...c.from], to: [...c.to] };
 	});
-	return { modules, cables };
+	const midi = (data.midi ?? []).map((m) => {
+		if (!Number.isInteger(m?.cc) || m.cc < 0 || m.cc > 127 || !types.get(m.module)?.controls.some((c) => c.address === m.address))
+			throw new Error(`MIDI-Zuordnung zeigt auf einen Regler, den es nicht gibt: ${m?.module} ${m?.address}`);
+		return { cc: m.cc, module: m.module, address: m.address };
+	});
+	return { modules, cables, midi };
 }
 
 export class Rack {
@@ -30,6 +35,8 @@ export class Rack {
 		this.onOutput = onOutput;
 		this.modules = new Map();
 		this.cables = [];
+		// MIDI controller number -> the one control it moves.
+		this.midi = new Map();
 		this.analyser = new AnalyserNode(ctx, { fftSize: 2048 });
 		this.analyser.connect(ctx.destination);
 		// A Faust worklet skips its block while its input has no channels, so every
@@ -80,6 +87,7 @@ export class Rack {
 		const inst = this.modules.get(id);
 		if (!inst) return;
 		for (const cable of this.#cablesOf(id)) this.disconnect(cable);
+		this.unlearn(id);
 		this.#unwire(inst);
 		this.modules.delete(id);
 		this.onChange();
@@ -103,6 +111,8 @@ export class Rack {
 			for (const { from, to } of cables)
 				if (this.modules.get(from[0]).def.outputs[from[1]] && this.modules.get(to[0]).def.inputs[to[1]])
 					this.connect(from, to);
+			for (const [cc, target] of this.midi)
+				if (target.id === old.id && !def.controls.some((c) => c.address === target.address)) this.midi.delete(cc);
 		}
 		this.onChange();
 	}
@@ -167,6 +177,22 @@ export class Rack {
 		this.onChange();
 	}
 
+	learn(cc, id, address) {
+		this.unlearn(id, address);
+		this.midi.set(cc, { id, address });
+		this.onChange();
+	}
+
+	unlearn(id, address) {
+		for (const [cc, target] of this.midi)
+			if (target.id === id && (address === undefined || target.address === address)) this.midi.delete(cc);
+		this.onChange();
+	}
+
+	ccOf(id, address) {
+		for (const [cc, target] of this.midi) if (target.id === id && target.address === address) return cc;
+	}
+
 	poke(id, address, value) {
 		this.modules.get(id)?.node.setParamValue(address, value);
 	}
@@ -176,6 +202,7 @@ export class Rack {
 		for (const id of [...this.modules.keys()]) this.remove(id);
 		for (const m of patch.modules) await this.add(m.type, m);
 		for (const c of patch.cables) this.connect(c.from, c.to);
+		for (const m of patch.midi) this.learn(m.cc, m.module, m.address);
 	}
 
 	toJSON() {
@@ -183,6 +210,7 @@ export class Rack {
 			format: FORMAT,
 			modules: [...this.modules.values()].map(({ id, def, params }) => ({ id, type: def.id, params })),
 			cables: this.cables.map(({ from, to }) => ({ from, to })),
+			midi: [...this.midi].map(([cc, { id, address }]) => ({ cc, module: id, address })),
 		};
 	}
 }

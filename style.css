@@ -80,3 +80,10 @@ dialog form { display: flex; align-items: center; justify-content: flex-end; gap
 	.module { min-height: 0; }
 }
 select { font: inherit; font-size: 11px; color: inherit; background: #111216; border: 1px solid var(--color, var(--line)); border-radius: 6px; min-height: 36px; padding: 2px 4px; max-width: 100%; }
+.pads { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 0 8px; }
+.pads button { min-height: 48px; padding: 0; touch-action: none; }
+.pads button.on { background: var(--gate); }
+.control { position: relative; }
+.learning .control[data-address] { outline: 1px dashed var(--dim); outline-offset: 1px; border-radius: 6px; cursor: pointer; }
+.learning .control.target { outline: 2px solid var(--text); }
+.control[data-cc]::before { content: attr(data-cc); position: absolute; top: -4px; right: 0; padding: 0 3px; border-radius: 6px; background: var(--cv); color: #000; font-size: 9px; }

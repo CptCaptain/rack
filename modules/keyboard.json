@@ -3,7 +3,7 @@
   "color": "#e8e4d8",
   "widget": "keyboard",
   "columns": 2,
-  "description": "Tastatur zum Spielen: Maus, Finger oder die Tasten A bis L. Gibt Tonhöhe und Gate aus.",
+  "description": "Tastatur zum Spielen: Maus, Finger, die Tasten A bis L oder ein MIDI-Keyboard. Gibt Tonhöhe, Gate, Anschlagstärke und Modulationsrad aus.",
   "inputs": [],
   "outputs": [
     {
@@ -13,6 +13,14 @@
     {
       "name": "Gate",
       "kind": "gate"
+    },
+    {
+      "name": "Vel",
+      "kind": "cv"
+    },
+    {
+      "name": "Mod",
+      "kind": "cv"
     }
   ],
   "group": "Spielen und Takt"

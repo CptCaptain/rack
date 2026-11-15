@@ -1,4 +1,8 @@
+import { valueFromMidi } from "./controls.js";
 import { ModuleLibrary } from "./faust.js";
+import { keys } from "./keyboard.js";
+import { openMidi } from "./midi.js";
+import { hitPad } from "./pads.js";
 import { Rack } from "./rack.js";
 import { RackView, h } from "./ui.js";
 
@@ -78,6 +82,40 @@ async function pollModules() {
 	setTimeout(pollModules, POLL_MS);
 }
 
+// Notes on channel 10 are drum pads, all other notes play the Keyboard modules.
+// A controller moves the knob it was bound to; the mod wheel reaches the Keyboard unless it is bound.
+function onMidi(event) {
+	if (event.type === "note") return event.channel === 10 ? hitPad(event.note, event.velocity) : keys.play(event.note, event.velocity);
+	if (event.type === "bend") return keys.bend(event.value);
+	const picked = view.learnTarget;
+	if (picked) {
+		rack.learn(event.cc, picked.id, picked.address);
+		view.learnTarget = null;
+		view.render();
+		say(`Regler ${event.cc} am Gerät steuert jetzt ${picked.id} ${picked.address.split("/").pop()}.`);
+	}
+	const bound = rack.midi.get(event.cc);
+	if (!bound) return event.cc === 1 && keys.mod(event.value / 127);
+	const control = rack.modules.get(bound.id).def.controls.find((c) => c.address === bound.address);
+	const value = valueFromMidi(control, event.value);
+	if (value === null) return;
+	rack.setParam(bound.id, bound.address, value);
+	view.show(bound.id, bound.address, value);
+}
+
+async function connectMidi() {
+	if (!navigator.requestMIDIAccess) return say("Dieser Browser kann kein Web MIDI. Chrome und Edge können es.", true);
+	try {
+		await openMidi(onMidi, (inputs) => {
+			say(inputs.length ? `MIDI verbunden: ${inputs.join(", ")}` : "MIDI ist an, aber es ist kein Gerät angeschlossen.");
+			$("btn-midi").setAttribute("aria-pressed", "true");
+			$("btn-learn").disabled = false;
+		});
+	} catch (err) {
+		say(`MIDI nicht erlaubt: ${err.message}`, true);
+	}
+}
+
 function drawScope() {
 	const canvas = $("scope");
 	const g = canvas.getContext("2d");
@@ -134,6 +172,8 @@ async function start() {
 	reportFailures(failed);
 	drawScope();
 	setTimeout(pollModules, POLL_MS);
+	// Once allowed, MIDI comes back on its own; the first time needs the button because the browser asks.
+	navigator.permissions?.query({ name: "midi" }).then((permission) => permission.state === "granted" && connectMidi(), () => {});
 	window.faustRack = { rack, view, library, openPatch };
 	$("start").textContent = "Weiter";
 	$("bar").inert = false;
@@ -181,6 +221,13 @@ $("file").addEventListener("change", async (e) => {
 	} catch (err) {
 		say(`Import fehlgeschlagen: ${err.message}`, true);
 	}
+});
+$("btn-midi").addEventListener("click", connectMidi);
+$("btn-learn").addEventListener("click", () => {
+	const on = $("btn-learn").getAttribute("aria-pressed") !== "true";
+	$("btn-learn").setAttribute("aria-pressed", String(on));
+	view.setLearning(on);
+	say(on ? "Lernen: erst einen Regler im Rack antippen, dann den Regler am Gerät bewegen. Doppelklick löst die Zuordnung." : "", on);
 });
 $("btn-power").addEventListener("click", async () => {
 	await (rack.ctx.state === "running" ? rack.ctx.suspend() : rack.ctx.resume());

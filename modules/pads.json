@@ -1,0 +1,43 @@
+{
+  "name": "Pads",
+  "group": "Spielen und Takt",
+  "color": "#ef476f",
+  "widget": "pads",
+  "columns": 2,
+  "description": "Acht Schlagflächen: tippen, Tasten 1 bis 8 oder die Pads eines MIDI-Controllers. Jede gibt ein eigenes Gate aus, zum Beispiel für Kick und Snare.",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "1",
+      "kind": "gate"
+    },
+    {
+      "name": "2",
+      "kind": "gate"
+    },
+    {
+      "name": "3",
+      "kind": "gate"
+    },
+    {
+      "name": "4",
+      "kind": "gate"
+    },
+    {
+      "name": "5",
+      "kind": "gate"
+    },
+    {
+      "name": "6",
+      "kind": "gate"
+    },
+    {
+      "name": "7",
+      "kind": "gate"
+    },
+    {
+      "name": "8",
+      "kind": "gate"
+    }
+  ]
+}

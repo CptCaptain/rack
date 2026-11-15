@@ -23,6 +23,12 @@ const page = await browser.newPage({ viewport: { width: 1500, height: 900 } });
 const consoleProblems = [];
 page.on("console", (msg) => ["error", "warning"].includes(msg.type()) && consoleProblems.push(`${msg.type()}: ${msg.text()}`));
 page.on("pageerror", (err) => consoleProblems.push(`pageerror: ${err.message}`));
+// Headless Chromium has no MIDI devices, so one fake input stands in. fakeMidi(...) sends its bytes.
+await page.addInitScript(() => {
+	const input = { name: "Test Keys", onmidimessage: null };
+	window.fakeMidi = (...bytes) => input.onmidimessage?.({ data: new Uint8Array(bytes) });
+	Object.defineProperty(navigator, "requestMIDIAccess", { value: async () => ({ inputs: new Map([["in", input]]), outputs: new Map(), onstatechange: null }) });
+});
 
 const peak = () =>
 	page.evaluate(async () => {
@@ -108,6 +114,41 @@ try {
 	await page.click("#start");
 	await page.waitForFunction(() => window.faustRack?.rack.modules.size, null, { timeout: 60_000 });
 	check((await cables()) === first.cables.length, "patch survives a reload (localStorage)");
+
+	const tastatur = JSON.parse(readFileSync(`${dir}/patches/tastatur.json`, "utf8"));
+	const param = (id, address) => page.evaluate(([id, address]) => window.faustRack.rack.modules.get(id).params[address], [id, address]);
+	await page.click("#btn-midi");
+	check(/Test Keys/.test(await page.textContent("#status")), "the MIDI button connects and names the device");
+	await page.evaluate((patch) => window.faustRack.openPatch(patch), tastatur);
+	await page.evaluate(() => window.fakeMidi(0x90, 64, 100));
+	await page.waitForTimeout(400);
+	check((await peak()) > 0.005 && (await page.locator('.keys i[data-note="64"].on').count()) === 1, "a MIDI note plays the Keyboard module");
+	await page.evaluate(() => window.fakeMidi(0x80, 64, 0));
+	check((await page.locator(".keys i.on").count()) === 0, "note off releases the key");
+	await page.click("#btn-learn");
+	await page.click('.module[data-id="vcf1"] .control[data-address="/vcf/Cutoff"] .dial');
+	await page.evaluate(() => window.fakeMidi(0xb0, 74, 127));
+	const high = await param("vcf1", "/vcf/Cutoff");
+	await page.evaluate(() => window.fakeMidi(0xb0, 74, 0));
+	const low = await param("vcf1", "/vcf/Cutoff");
+	const shown = await page.textContent('.module[data-id="vcf1"] .control[data-address="/vcf/Cutoff"] output');
+	const badge = await page.getAttribute('.module[data-id="vcf1"] .control[data-address="/vcf/Cutoff"]', "data-cc");
+	check(high === 12000 && low === 30 && shown === "30 Hz" && badge === "74", `a learned controller moves its knob (${high}, ${low}, "${shown}", badge ${badge})`);
+	await page.click("#btn-learn");
+	const saved = await page.evaluate(() => JSON.stringify(window.faustRack.rack.toJSON().midi));
+	check(saved === '[{"cc":74,"module":"vcf1","address":"/vcf/Cutoff"}]', `the patch stores the binding ${saved}`);
+	await page.evaluate((patch) => window.faustRack.openPatch(patch), {
+		format: "faust-rack/1",
+		modules: [{ id: "pads1", type: "pads", params: {} }, { id: "kick1", type: "kick", params: {} }, { id: "output1", type: "output", params: {} }],
+		cables: [{ from: ["pads1", 0], to: ["kick1", 0] }, { from: ["kick1", 0], to: ["output1", 0] }],
+	});
+	await page.waitForTimeout(500);
+	check((await peak()) < 0.001, "the Pads patch is silent until a pad is hit");
+	await page.evaluate(() => window.fakeMidi(0x99, 36, 127));
+	const hit = await peak();
+	await page.evaluate(() => window.fakeMidi(0x89, 36, 0));
+	check(hit > 0.05, `a MIDI pad note on channel 10 triggers the kick, peak ${hit.toFixed(3)}`);
+	await page.evaluate((patch) => window.faustRack.openPatch(patch), first);
 
 	// Live update: a new module appears, then its changed source replaces the running instance.
 	const live = {
