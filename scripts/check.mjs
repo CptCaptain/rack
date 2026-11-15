@@ -249,6 +249,15 @@ try {
 	await page.evaluate((patch) => window.faustRack.openPatch(patch), stored);
 	check((await mods()) === stillMod, "a patch with a modulation loads again");
 
+	// The Beat grid: a tap on a cell changes the track's pattern, and the patch keeps it.
+	{
+		await page.evaluate((patch) => window.faustRack.openPatch(patch), JSON.parse(readFileSync(`${dir}/patches/beat.json`, "utf8")));
+		await page.waitForTimeout(400);
+		await page.click(".grid button >> nth=2");
+		const pattern = await page.evaluate(() => window.faustRack.rack.toJSON().modules.find((m) => m.id === "beat1").params["/beat/t1"]);
+		check(pattern === 4369 + 4 && (await page.locator(".grid button.on").count()) === 5 + 2 + 8 && (await page.locator(".grid button.now").count()) === 4, `a tap on the Beat grid adds a step to the pattern (${pattern}) and the running step is lit`);
+	}
+
 	// Named patches and the share link.
 	{
 		await page.evaluate((patch) => window.faustRack.openPatch(patch), first);

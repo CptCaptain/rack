@@ -124,3 +124,10 @@ select { font: inherit; font-size: 11px; color: inherit; background: #111216; bo
 #picker .entry { display: flex; gap: 4px; margin-bottom: 4px; }
 #picker .entry > button:first-child { flex: 1; display: flex; flex-direction: column; text-align: left; border-left: 5px solid var(--color); }
 #picker .erase { min-width: 44px; }
+.grid { display: grid; grid-template-columns: repeat(16, 18px); gap: 3px 2px; padding: 0 8px; justify-content: center; }
+.grid button { min-height: 30px; min-width: 0; padding: 0; border-radius: 3px; }
+.grid button:nth-child(4n + 1) { margin-left: 3px; }
+.grid button.on { background: var(--color); border-color: var(--color); }
+.grid button.now { outline: 2px solid var(--text); }
+.steps { display: grid; grid-template-columns: repeat(var(--cols), 58px); justify-content: center; justify-items: center; gap: 4px 2px; padding: 0 8px; }
+.steps button { min-width: 40px; min-height: 40px; padding: 0; }

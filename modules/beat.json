@@ -1,0 +1,36 @@
+{
+  "name": "Beat",
+  "group": "Spielen und Takt",
+  "color": "#e05a4f",
+  "widget": "grid",
+  "columns": 2,
+  "description": "Schlagzeug-Raster: vier Spuren mit 16 Schritten zum Antippen. Jede Spur gibt ein Gate aus, zum Beispiel für Kick, Snare und Hi-Hat.",
+  "inputs": [
+    {
+      "name": "Clock",
+      "kind": "gate"
+    },
+    {
+      "name": "Reset",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "1",
+      "kind": "gate"
+    },
+    {
+      "name": "2",
+      "kind": "gate"
+    },
+    {
+      "name": "3",
+      "kind": "gate"
+    },
+    {
+      "name": "4",
+      "kind": "gate"
+    }
+  ]
+}

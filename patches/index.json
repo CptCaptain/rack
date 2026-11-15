@@ -25,6 +25,11 @@
 		"description": "Kick, Snare und Hi-Hat. Dreh an Treffer und Dreh im Euclid und der Rhythmus ändert sich."
 	},
 	{
+		"file": "beat.json",
+		"name": "Beat-Raster",
+		"description": "Ein Schlagzeug zum Antippen: Tippe Kästchen im Raster an und der Beat ändert sich."
+	},
+	{
 		"file": "zufall.json",
 		"name": "Zufallsmelodie",
 		"description": "Der Zufall würfelt Töne, der Quantizer zwingt sie in eine Tonleiter, eine Saite zupft sie."

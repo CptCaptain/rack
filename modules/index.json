@@ -3,6 +3,7 @@
   "pads",
   "clock",
   "seq",
+  "beat",
   "euclid",
   "divider",
   "vco",

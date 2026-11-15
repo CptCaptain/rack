@@ -2,7 +2,7 @@
   "name": "Sequencer",
   "color": "#f08a4b",
   "columns": 4,
-  "description": "Spielt 8 Tonhöhen der Reihe nach ab. Jeder Clock-Impuls schaltet einen Schritt weiter.",
+  "description": "Spielt 8 Tonhöhen der Reihe nach ab. Jeder Clock-Impuls schaltet einen Schritt weiter. Die Knöpfe darunter machen aus einem Schritt eine Pause oder halten den Ton davor.",
   "inputs": [
     {
       "name": "Clock",
@@ -23,5 +23,6 @@
       "kind": "gate"
     }
   ],
-  "group": "Spielen und Takt"
+  "group": "Spielen und Takt",
+  "widget": "steps"
 }
