@@ -1,6 +1,7 @@
 import { valueFromMidi } from "./controls.js";
 import { edits } from "./edits.js";
 import { breed } from "./evolve.js";
+import { explain } from "./explain.js";
 import { ModuleLibrary } from "./faust.js";
 import { keys } from "./keyboard.js";
 import { forgetWorld } from "./life.js";
@@ -473,6 +474,15 @@ const showView = (mode) => {
 	say(mode === "pin" ? "Tippe die Regler an, die auf die Spielfläche sollen. Ein Stern zeigt die gewählten. Dann „Fertig“." : "", mode === "pin");
 };
 $("btn-play").addEventListener("click", () => showView(view.staged ? "rack" : "play"));
+// Erklären: while it is on, a tap changes nothing and explains what was tapped.
+const setExplaining = (on) => {
+	$("btn-explain").setAttribute("aria-pressed", String(on));
+	$("explain").hidden = !on;
+	view.onExplain = (subject) => explain($("explain"), rack, subject);
+	view.setExplaining(on);
+};
+$("btn-explain").addEventListener("click", () => setExplaining($("btn-explain").getAttribute("aria-pressed") !== "true"));
+$("explain-close").addEventListener("click", () => setExplaining(false));
 $("btn-pin").addEventListener("click", () => showView("pin"));
 $("btn-undo").addEventListener("click", undo);
 $("btn-redo").addEventListener("click", redo);

@@ -177,6 +177,11 @@ export class RackView {
 		this.learnTarget = null;
 		this.staged = false;
 		this.pinning = false;
+		// Explain mode: a tap changes nothing and is handed to onExplain instead.
+		this.explaining = false;
+		this.onExplain = () => {};
+		root.addEventListener("pointerdown", (e) => this.#explainTap(e), true);
+		for (const type of ["click", "dblclick", "change"]) root.addEventListener(type, (e) => this.explaining && !e.target.closest(".popover") && (e.stopPropagation(), e.preventDefault()), true);
 		rack.onOutput = (id, address, value) => this.outputs.get(`${id} ${address}`)?.(value);
 		new ResizeObserver(() => this.draw()).observe(this.modulesEl);
 		this.modulesEl.addEventListener("pointerdown", (e) => this.#pressJack(e));
@@ -537,13 +542,8 @@ export class RackView {
 		this.#hold(null);
 	}
 
-	// A tap on a cable opens a small box that lists the cables under the finger: one button
-	// each to remove exactly that cable, and for a modulation how far it moves the knob.
-	// A tap beside everything puts a held cable away.
-	#select(e) {
-		if (e.target.closest(".popover, .banner, .jack")) return;
-		if (this.held) return this.#hold(null);
-		const [x, y] = this.#point(e.clientX, e.clientY);
+	// The cables that run within reach of a point, nearest first.
+	#cablesNear(x, y) {
 		const reach = (el) => {
 			const length = el.getTotalLength();
 			let best = Infinity;
@@ -553,9 +553,47 @@ export class RackView {
 			}
 			return best;
 		};
-		const onControl = e.target.closest(".control, button, select, .keys, .pads");
-		const near = onControl ? [] : this.paths.map((entry) => ({ ...entry, far: reach(entry.el) })).filter((entry) => entry.far < 14);
-		this.box = near.length ? { items: near.sort((a, b) => a.far - b.far).map((entry) => entry.item), active: 0, jack: null, x, y } : null;
+		return this.paths.map((entry) => ({ ...entry, far: reach(entry.el) })).filter((entry) => entry.far < 14).sort((a, b) => a.far - b.far).map((entry) => entry.item);
+	}
+
+	setExplaining(on) {
+		this.explaining = on;
+		this.#hold(null);
+		this.root.classList.toggle("explaining", on);
+		for (const el of this.root.querySelectorAll(".explained")) el.classList.remove("explained");
+		if (on) this.onExplain({ kind: "tour" });
+	}
+
+	#explainTap(e) {
+		if (!this.explaining) return;
+		e.stopPropagation();
+		e.preventDefault();
+		for (const el of this.root.querySelectorAll(".explained")) el.classList.remove("explained");
+		const section = e.target.closest(".module");
+		const jack = e.target.closest(".jack");
+		const control = e.target.closest(".control[data-address]");
+		const mark = (el) => el.classList.add("explained");
+		if (jack) return mark(jack), this.onExplain({ kind: "jack", ...this.#ref(jack) });
+		if (control) return mark(control), this.onExplain({ kind: "control", id: section.dataset.id, address: control.dataset.address });
+		if (section) {
+			const button = e.target.closest(".mute") ? "mute" : e.target.closest(".close") ? "close" : e.target.closest(".move") ? "move" : undefined;
+			return mark(section), this.onExplain({ kind: "module", id: section.dataset.id, button });
+		}
+		const [item] = this.staged ? [] : this.#cablesNear(...this.#point(e.clientX, e.clientY));
+		this.box = item ? { items: [item], active: 0, jack: null, x: -1000, y: -1000 } : null;
+		this.draw();
+		this.onExplain(item ? { kind: "cable", item } : { kind: "tour" });
+	}
+
+	// A tap on a cable opens a small box that lists the cables under the finger: one button
+	// each to remove exactly that cable, and for a modulation how far it moves the knob.
+	// A tap beside everything puts a held cable away.
+	#select(e) {
+		if (e.target.closest(".popover, .banner, .jack")) return;
+		if (this.held) return this.#hold(null);
+		const [x, y] = this.#point(e.clientX, e.clientY);
+		const items = e.target.closest(".control, button, select, .keys, .pads") ? [] : this.#cablesNear(x, y);
+		this.box = items.length ? { items, active: 0, jack: null, x, y } : null;
 		this.draw();
 	}
 

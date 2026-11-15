@@ -258,6 +258,25 @@ try {
 	await page.evaluate((patch) => window.faustRack.openPatch(patch), stored);
 	check((await mods()) === stillMod, "a patch with a modulation loads again");
 
+	// Explain mode: a tap explains instead of acting.
+	{
+		await page.evaluate((patch) => window.faustRack.openPatch(patch), first);
+		await page.waitForTimeout(400);
+		await page.click("#btn-explain");
+		const tour = await page.locator("#explain p").allTextContents();
+		await page.click(jack("vco1", "in", 0));
+		const jackText = await page.textContent("#explain .text");
+		await page.waitForTimeout(250);
+		const live = await page.textContent("#explain output");
+		await page.click('.module[data-id="vcf1"] .mute');
+		const muteText = await page.textContent("#explain .text");
+		await page.click('.module[data-id="vcf1"] .control[data-address="/vcf/Cutoff"] .dial');
+		const knobText = await page.textContent("#explain .text");
+		const untouched = await page.evaluate(() => ({ muted: window.faustRack.rack.modules.get("vcf1").muted, cables: window.faustRack.rack.cables.length, held: document.querySelectorAll(".jack.held").length }));
+		await page.click("#btn-explain");
+		check(tour.length === first.cables.length + 1 && /Clock 1\/8 geht in Sequencer Clock/.test(tour.join(" ")) && /VCO: V\/Oct/.test(jackText) && /Tonhöhe/.test(jackText) && /Gerade: /.test(live) && /stumm/.test(muteText) && /Grenze des Filters/.test(knobText) && !untouched.muted && untouched.cables === first.cables.length && untouched.held === 0 && (await page.locator("#explain").isHidden()), `explain mode walks through the patch in ${tour.length} sentences, explains a jack with its live value (${live}), a button and a knob, and changes nothing`);
+	}
+
 	// The play view, breeding and the Web module, on the first patch.
 	{
 		await page.route("**/wetter-test", (route) => route.fulfill({ json: { current: { temperature_2m: 12.5 } } }));

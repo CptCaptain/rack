@@ -11,6 +11,7 @@ The site is static files. There is no bundler and no backend. The interface is i
 - Undo, named patches, a share link that carries the patch, and recording to WAV.
 - An editor in the page: change a module's Faust program and hear it at once, or write a new module that lives in your browser.
 - A play view that shows only the knobs you picked, large, and a breeder that offers variants of a patch to choose from.
+- An explain mode for beginners: tap a module, a jack, a knob or a cable and read in plain words what it is and what is happening there.
 - Patch by dragging from jack to jack, or tap one jack and then the other. Drop a cable on a knob to modulate it.
 - A rack that is open in a browser picks up new and changed modules within seconds, without a reload.
 - Compiled modules are kept in the browser, so a later start does not load the compiler.
@@ -103,6 +104,8 @@ Changes to `src/`, `index.html`, or `style.css` need `npm run build` and a reloa
 | `src/grid.js` | The Beat grid and the sequencer's step buttons. |
 | `src/sampler.js`, `src/samples.js` | The Sampler's file loader and where samples are kept. |
 | `src/record.js` | Records the output to a WAV file. |
+| `src/explain.js` | The explain mode: its texts and the live look at a signal. |
+| `src/edits.js`, `src/evolve.js`, `src/web.js` | Editor storage, breeding of patch variants, the Web module's fetcher. |
 | `src/store.js` | A key-value table in IndexedDB, for samples and compiled modules. |
 | `scripts/` | `vendor`, `build`, `serve`, `check`, `modules`, `probe`. |
 
