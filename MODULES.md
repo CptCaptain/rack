@@ -56,7 +56,7 @@ Trage danach `"ringmod"` in `modules/index.json` ein.
 | `columns` | nein | Regler pro Zeile. Vorgabe ist 2. |
 | `speakers` | nein | `true` schickt die zwei Ausgänge des Moduls an die Lautsprecher. `outputs` entfällt dann. |
 | `microphone` | nein | `true` speist die zwei Eingänge des Moduls aus dem Audio-Eingang des Rechners. `inputs` entfällt dann. |
-| `widget` | nein | Zusätzliches Bedienfeld: `"keyboard"`, `"pads"` oder `"midiout"`. |
+| `widget` | nein | Zusätzliches Bedienfeld: `"keyboard"`, `"pads"`, `"midiout"` oder `"life"`. |
 
 Eine Buchse hat `name` und `kind`. `kind` ist `audio`, `cv` oder `gate` und bestimmt nur die Farbe. Jede Buchse lässt sich mit jeder verbinden.
 
@@ -113,6 +113,7 @@ Ein Widget ist JavaScript in `src/` und verbindet versteckte Regler eines Moduls
 | `keyboard` | versteckte Regler `gate`, `note` (MIDI-Nummer), `vel`, `bend`, `mod` | Klaviatur, Computertasten und MIDI-Noten |
 | `pads` | versteckte Taster `pad1` bis `pad8` | acht Schlagflächen, Tasten 1 bis 8, MIDI-Noten auf Kanal 10 |
 | `midiout` | versteckte Bargraphs `note` und `gate`, Regler `Kanal` | schickt MIDI-Noten an alle MIDI-Ausgänge |
+| `life` | die versteckten Regler und Bargraphs aus `modules/life.dsp` | rechnet und zeichnet die Welt des Moduls Leben |
 
 Ein neues Widget braucht eine Datei in `src/`, einen Eintrag in `WIDGETS` in `src/ui.js` und einen Build.
 

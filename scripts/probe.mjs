@@ -106,6 +106,33 @@ for (const [name, data, pick, ok] of probes) {
 	if (!pass) failed++;
 	console.log(`${pass ? "ok  " : "FAIL"} ${name}: ${Number(value.toFixed(3))}${result.finite ? "" : " (non-finite samples)"}`);
 }
+// The Leben module's world, without sound: does selection work, and does it need mutation?
+const life = await page.evaluate(async () => {
+	const { World } = await import("/src/life-world.js");
+	const lag = (mutation, climateAt, steps) => {
+		const world = new World(1);
+		let off = 0;
+		let counted = 0;
+		for (let i = 0; i < steps; i++) {
+			const climate = climateAt(i);
+			world.step({ food: 0.5, climate, mutation });
+			if (i < 1000 || !world.creatures.length) continue;
+			off += Math.abs(world.mean("warmth") - climate);
+			counted++;
+		}
+		return off / counted;
+	};
+	const seasons = (i) => 0.5 + 0.3 * Math.sin((i / 6000) * 2 * Math.PI);
+	return { steady: lag(0.3, () => 0.8, 8000), evolving: lag(0.8, seasons, 12000), frozen: lag(0, seasons, 12000) };
+});
+for (const [name, value, ok] of [
+	["life in a steady warm climate carries the matching gene (distance)", life.steady, between(0, 0.08)],
+	["life with mutation follows slow seasons (distance)", life.evolving, between(0, 0.1)],
+	["life without mutation falls behind the same seasons (distance)", life.frozen, between(0.25, 1)],
+]) {
+	if (!ok(value)) failed++;
+	console.log(`${ok(value) ? "ok  " : "FAIL"} ${name}: ${value.toFixed(3)}`);
+}
 if (consoleProblems.length) {
 	failed++;
 	console.log(`FAIL console: ${consoleProblems.join(" | ")}`);

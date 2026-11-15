@@ -1,0 +1,198 @@
+{
+	"format": "faust-rack/1",
+	"modules": [
+		{
+			"id": "lfo1",
+			"type": "lfo",
+			"params": {
+				"/lfo/Rate": 0.02,
+				"/lfo/Tiefe": 0.35
+			}
+		},
+		{
+			"id": "life1",
+			"type": "life",
+			"params": {
+				"/life/Tempo": 0.5,
+				"/life/Mutation": 0.5
+			}
+		},
+		{
+			"id": "quantizer1",
+			"type": "quantizer",
+			"params": {
+				"/quantizer/Skala": 3
+			}
+		},
+		{
+			"id": "pluck1",
+			"type": "pluck",
+			"params": {
+				"/pluck/Decay": 2.5,
+				"/pluck/Hell": 0.55
+			}
+		},
+		{
+			"id": "kick1",
+			"type": "kick",
+			"params": {
+				"/kick/Ton": 45,
+				"/kick/Pegel": 0.5
+			}
+		},
+		{
+			"id": "mixer1",
+			"type": "mixer",
+			"params": {}
+		},
+		{
+			"id": "delay1",
+			"type": "delay",
+			"params": {
+				"/delay/Zeit": 380,
+				"/delay/Feedback": 0.4,
+				"/delay/Mix": 0.25
+			}
+		},
+		{
+			"id": "reverb1",
+			"type": "reverb",
+			"params": {
+				"/reverb/Dauer": 4,
+				"/reverb/Mix": 0.35
+			}
+		},
+		{
+			"id": "output1",
+			"type": "output",
+			"params": {
+				"/output/Volume": 0.4
+			}
+		}
+	],
+	"cables": [
+		{
+			"from": [
+				"lfo1",
+				0
+			],
+			"to": [
+				"life1",
+				1
+			]
+		},
+		{
+			"from": [
+				"life1",
+				0
+			],
+			"to": [
+				"quantizer1",
+				0
+			]
+		},
+		{
+			"from": [
+				"quantizer1",
+				0
+			],
+			"to": [
+				"pluck1",
+				0
+			]
+		},
+		{
+			"from": [
+				"life1",
+				1
+			],
+			"to": [
+				"pluck1",
+				1
+			]
+		},
+		{
+			"from": [
+				"life1",
+				2
+			],
+			"to": [
+				"kick1",
+				0
+			]
+		},
+		{
+			"from": [
+				"pluck1",
+				0
+			],
+			"to": [
+				"mixer1",
+				0
+			]
+		},
+		{
+			"from": [
+				"kick1",
+				0
+			],
+			"to": [
+				"mixer1",
+				1
+			]
+		},
+		{
+			"from": [
+				"mixer1",
+				0
+			],
+			"to": [
+				"delay1",
+				0
+			]
+		},
+		{
+			"from": [
+				"delay1",
+				0
+			],
+			"to": [
+				"reverb1",
+				0
+			]
+		},
+		{
+			"from": [
+				"reverb1",
+				0
+			],
+			"to": [
+				"output1",
+				1
+			]
+		},
+		{
+			"from": [
+				"reverb1",
+				1
+			],
+			"to": [
+				"output1",
+				2
+			]
+		}
+	],
+	"mods": [
+		{
+			"from": [
+				"life1",
+				3
+			],
+			"to": [
+				"delay1",
+				"/delay/Mix"
+			],
+			"depth": 0.3
+		}
+	]
+}

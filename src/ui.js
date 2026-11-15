@@ -1,10 +1,11 @@
 import { clamp, travel } from "./controls.js";
 import { keyboard } from "./keyboard.js";
+import { life } from "./life.js";
 import { midiout } from "./midiout.js";
 import { pads } from "./pads.js";
 
 // A widget gets the module definition and { id, poke, value, onOutput }, all keyed by control label.
-const WIDGETS = { keyboard, pads, midiout };
+const WIDGETS = { keyboard, pads, midiout, life };
 const SVG = "http://www.w3.org/2000/svg";
 // While a cable is dragged this close to the rack's edge, the rack scrolls.
 const EDGE = 50;

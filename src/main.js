@@ -1,6 +1,7 @@
 import { valueFromMidi } from "./controls.js";
 import { ModuleLibrary } from "./faust.js";
 import { keys } from "./keyboard.js";
+import { forgetWorld } from "./life.js";
 import { openMidi } from "./midi.js";
 import { releaseMidiOut } from "./midiout.js";
 import { hitPad } from "./pads.js";
@@ -156,7 +157,10 @@ async function start() {
 	const save = () => localStorage.setItem(STORE, JSON.stringify(rack));
 	let saveTimer;
 	rack = new Rack(ctx, library.defs, {
-		onRemove: releaseMidiOut,
+		onRemove: (id) => {
+			releaseMidiOut(id);
+			forgetWorld(id);
+		},
 		onChange: () => {
 			clearTimeout(saveTimer);
 			saveTimer = setTimeout(save, 300);

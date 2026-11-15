@@ -33,5 +33,10 @@
 		"file": "supersaw.json",
 		"name": "Supersaw-Fläche",
 		"description": "Breite Flächen zum Spielen: Supersaw, Filter, Chorus. Tasten A bis L."
+	},
+	{
+		"file": "leben.json",
+		"name": "Leben",
+		"description": "Eine Welt aus Wesen spielt die Musik: Jede Geburt zupft einen Ton, jeder Tod schlägt die Trommel. Ein LFO lässt das Klima wandern."
 	}
 ]

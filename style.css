@@ -104,3 +104,4 @@ select { font: inherit; font-size: 11px; color: inherit; background: #111216; bo
 .banner { position: fixed; z-index: 4; left: 50%; bottom: 12px; translate: -50%; display: flex; align-items: center; gap: 10px; width: min(460px, 94vw); padding: 8px 10px; background: var(--panel); border: 1px solid var(--text); border-radius: 10px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.5); }
 .banner[hidden] { display: none; }
 .banner span { flex: 1; }
+.life { display: block; width: 300px; max-width: calc(100% - 16px); margin: 0 8px; border-radius: 6px; background: #0d0e11; }

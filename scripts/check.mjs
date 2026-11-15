@@ -90,7 +90,20 @@ try {
 		check(level > 0.005 && level <= 1, `patch "${name}" reaches the output, peak ${level.toFixed(3)}`);
 	}
 
+	await page.evaluate((patch) => window.faustRack.openPatch(patch), JSON.parse(readFileSync(`${dir}/patches/leben.json`, "utf8")));
+	await page.waitForTimeout(3000);
+	const alive = await page.evaluate(() => {
+		const pixels = document.querySelector("canvas.life").getContext("2d").getImageData(0, 0, 300, 180).data;
+		const colors = new Set();
+		for (let i = 0; i < pixels.length; i += 4) colors.add((pixels[i] << 16) | (pixels[i + 1] << 8) | pixels[i + 2]);
+		const node = window.faustRack.rack.modules.get("life1").node;
+		return { colors: colors.size, pop: node.getParamValue("/life/pop") };
+	});
+	check(alive.colors > 5 && alive.pop > 0, `the Leben module draws its world and reports a population (${alive.colors} colours, pop ${alive.pop.toFixed(2)})`);
+
 	const first = JSON.parse(readFileSync(`${dir}/patches/${examples[0].file}`, "utf8"));
+	await page.evaluate((patch) => window.faustRack.openPatch(patch), first);
+	await page.waitForTimeout(800);
 	const cables = () => page.evaluate(() => window.faustRack.rack.cables.length);
 	await page.screenshot({ path: shot });
 	await page.setViewportSize({ width: 390, height: 800 });
