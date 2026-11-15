@@ -35,6 +35,11 @@
 		"description": "Ein Schlagzeug zum Antippen: Tippe Kästchen im Raster an und der Beat ändert sich."
 	},
 	{
+		"file": "arpeggio.json",
+		"name": "Arpeggio",
+		"description": "Ein FM-Klang perlt durch gebrochene Akkorde. Die Zufallsschleife wechselt alle zwei Takte den Grundton, das Echo springt hin und her."
+	},
+	{
 		"file": "zufall.json",
 		"name": "Zufallsmelodie",
 		"description": "Der Zufall würfelt Töne, der Quantizer zwingt sie in eine Tonleiter, eine Saite zupft sie."

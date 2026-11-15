@@ -1,0 +1,214 @@
+{
+	"format": "faust-rack/1",
+	"modules": [
+		{
+			"id": "clock1",
+			"type": "clock",
+			"params": {
+				"/clock/Tempo": 124
+			}
+		},
+		{
+			"id": "divider1",
+			"type": "divider",
+			"params": {}
+		},
+		{
+			"id": "turing1",
+			"type": "turing",
+			"params": {
+				"/turing/Wandel": 0.15,
+				"/turing/Schritte": 4,
+				"/turing/Bereich": 0.5
+			}
+		},
+		{
+			"id": "quantizer1",
+			"type": "quantizer",
+			"params": {
+				"/quantizer/Skala": 3
+			}
+		},
+		{
+			"id": "arp1",
+			"type": "arp",
+			"params": {
+				"/arp/Akkord": 1,
+				"/arp/Richtung": 2,
+				"/arp/Oktaven": 2
+			}
+		},
+		{
+			"id": "fm1",
+			"type": "fm",
+			"params": {
+				"/fm/Oktave": -1,
+				"/fm/Verhältnis": 3,
+				"/fm/Index": 1.5
+			}
+		},
+		{
+			"id": "adsr1",
+			"type": "adsr",
+			"params": {
+				"/adsr/Attack": 0.003,
+				"/adsr/Decay": 0.18,
+				"/adsr/Sustain": 0.15,
+				"/adsr/Release": 0.2
+			}
+		},
+		{
+			"id": "vca1",
+			"type": "vca",
+			"params": {}
+		},
+		{
+			"id": "pingpong1",
+			"type": "pingpong",
+			"params": {
+				"/pingpong/Zeit": 363,
+				"/pingpong/Feedback": 0.45,
+				"/pingpong/Mix": 0.35
+			}
+		},
+		{
+			"id": "output1",
+			"type": "output",
+			"params": {
+				"/output/Volume": 0.35
+			}
+		}
+	],
+	"cables": [
+		{
+			"from": [
+				"clock1",
+				2
+			],
+			"to": [
+				"arp1",
+				1
+			]
+		},
+		{
+			"from": [
+				"clock1",
+				0
+			],
+			"to": [
+				"divider1",
+				0
+			]
+		},
+		{
+			"from": [
+				"divider1",
+				3
+			],
+			"to": [
+				"turing1",
+				0
+			]
+		},
+		{
+			"from": [
+				"turing1",
+				0
+			],
+			"to": [
+				"quantizer1",
+				0
+			]
+		},
+		{
+			"from": [
+				"quantizer1",
+				0
+			],
+			"to": [
+				"arp1",
+				0
+			]
+		},
+		{
+			"from": [
+				"arp1",
+				0
+			],
+			"to": [
+				"fm1",
+				0
+			]
+		},
+		{
+			"from": [
+				"arp1",
+				1
+			],
+			"to": [
+				"adsr1",
+				0
+			]
+		},
+		{
+			"from": [
+				"adsr1",
+				0
+			],
+			"to": [
+				"vca1",
+				1
+			]
+		},
+		{
+			"from": [
+				"adsr1",
+				0
+			],
+			"to": [
+				"fm1",
+				1
+			]
+		},
+		{
+			"from": [
+				"fm1",
+				0
+			],
+			"to": [
+				"vca1",
+				0
+			]
+		},
+		{
+			"from": [
+				"vca1",
+				0
+			],
+			"to": [
+				"pingpong1",
+				0
+			]
+		},
+		{
+			"from": [
+				"pingpong1",
+				0
+			],
+			"to": [
+				"output1",
+				1
+			]
+		},
+		{
+			"from": [
+				"pingpong1",
+				1
+			],
+			"to": [
+				"output1",
+				2
+			]
+		}
+	]
+}
