@@ -1,3 +1,5 @@
+import { clamp, travel } from "./controls.js";
+
 export const FORMAT = "faust-rack/1";
 
 const isRef = (ref) => Array.isArray(ref) && typeof ref[0] === "string" && Number.isInteger(ref[1]);
@@ -24,20 +26,31 @@ export function parsePatch(data, defs) {
 			throw new Error(`MIDI-Zuordnung zeigt auf einen Regler, den es nicht gibt: ${m?.module} ${m?.address}`);
 		return { cc: m.cc, module: m.module, address: m.address };
 	});
-	return { modules, cables, midi };
+	const mods = (data.mods ?? []).map((m) => {
+		const control = isRef(m?.from) && Array.isArray(m.to) && types.get(m.to[0])?.controls.find((c) => c.address === m.to[1]);
+		if (!control || control.hidden || !travel(control) || !types.get(m.from[0])?.outputs[m.from[1]] || !(Math.abs(m.depth) <= 1))
+			throw new Error(`Modulation ${m?.from?.join(":")} → ${m?.to?.join(" ")} passt nicht zum Patch`);
+		return { from: [...m.from], to: [...m.to], depth: m.depth };
+	});
+	return { modules, cables, midi, mods };
 }
 
 export class Rack {
 	#external;
+	#taps;
 
-	constructor(ctx, defs, { onChange = () => {}, onOutput = () => {}, onRemove = () => {} } = {}) {
+	constructor(ctx, defs, { onChange = () => {}, onOutput = () => {}, onRemove = () => {}, onModulated = () => {} } = {}) {
 		this.ctx = ctx;
 		this.defs = defs;
 		this.onChange = onChange;
 		this.onOutput = onOutput;
 		this.onRemove = onRemove;
+		this.onModulated = onModulated;
 		this.modules = new Map();
 		this.cables = [];
+		// A modulation moves a knob with a signal: { from: [id, port], to: [id, address], depth, tap, signal }.
+		// depth is the share of the knob's travel that a signal of 1 moves it.
+		this.mods = [];
 		// MIDI controller number -> the one control it moves.
 		this.midi = new Map();
 		this.analyser = new AnalyserNode(ctx, { fftSize: 2048 });
@@ -120,6 +133,7 @@ export class Rack {
 		const inst = this.modules.get(id);
 		if (!inst) return;
 		for (const cable of this.#cablesOf(id)) this.disconnect(cable);
+		for (const mod of this.#modsOf(id)) this.unmodulate(mod);
 		this.unlearn(id);
 		this.#unwire(inst);
 		this.modules.delete(id);
@@ -149,6 +163,8 @@ export class Rack {
 			}
 			const cables = this.#cablesOf(old.id);
 			for (const cable of cables) this.disconnect(cable);
+			const mods = this.#modsOf(old.id);
+			for (const mod of mods) this.unmodulate(mod);
 			this.#unwire(old);
 			this.modules.set(old.id, this.#wire(def, old.id, node));
 			for (const [address, value] of Object.entries(old.params))
@@ -158,6 +174,8 @@ export class Rack {
 					this.connect(from, to);
 			for (const [cc, target] of this.midi)
 				if (target.id === old.id && !def.controls.some((c) => c.address === target.address)) this.midi.delete(cc);
+			for (const { from, to, depth } of mods)
+				if (this.modules.get(from[0]).def.outputs[from[1]] && this.#control(to)) await this.modulate(from, to, depth);
 		}
 		this.onChange();
 	}
@@ -198,6 +216,64 @@ export class Rack {
 		this.onChange();
 	}
 
+	#control([id, address]) {
+		const control = this.modules.get(id)?.def.controls.find((c) => c.address === address);
+		return control && !control.hidden && travel(control) ? control : null;
+	}
+
+	async modulate(from, to, depth = 0.25) {
+		const valid = () => this.modules.get(from[0])?.def.outputs[from[1]] && this.#control(to);
+		if (!valid()) throw new Error("Das lässt sich nicht modulieren");
+		await (this.#taps ??= this.ctx.audioWorklet.addModule(new URL("./tap-worklet.js", import.meta.url)));
+		const existing = this.mods.find((m) => m.from[0] === from[0] && m.from[1] === from[1] && m.to[0] === to[0] && m.to[1] === to[1]);
+		if (existing || !valid()) return existing;
+		const mod = { from: [...from], to: [...to], depth, tap: new AudioWorkletNode(this.ctx, "tap"), signal: 0 };
+		mod.tap.port.onmessage = (e) => {
+			mod.signal = e.data;
+			this.#apply(...mod.to);
+		};
+		this.modules.get(from[0]).splitter.connect(mod.tap, from[1]);
+		mod.tap.connect(this.sink);
+		this.mods.push(mod);
+		this.onChange();
+		return mod;
+	}
+
+	unmodulate(mod) {
+		const index = this.mods.indexOf(mod);
+		if (index < 0) return;
+		this.modules.get(mod.from[0]).splitter.disconnect(mod.tap, mod.from[1]);
+		mod.tap.disconnect();
+		mod.tap.port.onmessage = null;
+		mod.tap.port.postMessage("stop");
+		this.mods.splice(index, 1);
+		this.#apply(...mod.to);
+		this.onChange();
+	}
+
+	setDepth(mod, depth) {
+		mod.depth = depth;
+		this.#apply(...mod.to);
+		this.onChange();
+	}
+
+	// Sends a control's value to its module: what the knob says, moved by every signal that modulates it.
+	#apply(id, address) {
+		const inst = this.modules.get(id);
+		if (!inst) return;
+		const mods = this.mods.filter((m) => m.to[0] === id && m.to[1] === address);
+		const control = inst.def.controls.find((c) => c.address === address);
+		const base = inst.params[address] ?? control.init;
+		const push = mods.reduce((sum, m) => sum + m.signal * m.depth, 0);
+		const value = mods.length ? travel(control).fromTurn(clamp(travel(control).toTurn(base) + push, 0, 1)) : base;
+		inst.node.setParamValue(address, value);
+		this.onModulated(id, address, mods.length ? value : null);
+	}
+
+	#modsOf(id) {
+		return this.mods.filter((m) => m.from[0] === id || m.to[0] === id);
+	}
+
 	#cablesOf(id) {
 		return this.cables.filter((c) => c.from[0] === id || c.to[0] === id);
 	}
@@ -218,7 +294,7 @@ export class Rack {
 		if (!inst.def.controls.some((c) => c.address === address))
 			return console.warn(`Patch: ${id} hat keinen Regler ${address}`);
 		inst.params[address] = value;
-		inst.node.setParamValue(address, value);
+		this.#apply(id, address);
 		this.onChange();
 	}
 
@@ -248,6 +324,7 @@ export class Rack {
 		for (const m of patch.modules) await this.add(m.type, m);
 		for (const c of patch.cables) this.connect(c.from, c.to);
 		for (const m of patch.midi) this.learn(m.cc, m.module, m.address);
+		for (const m of patch.mods) await this.modulate(m.from, m.to, m.depth);
 	}
 
 	toJSON() {
@@ -256,6 +333,7 @@ export class Rack {
 			modules: [...this.modules.values()].map(({ id, def, params }) => ({ id, type: def.id, params })),
 			cables: this.cables.map(({ from, to }) => ({ from, to })),
 			midi: [...this.midi].map(([cc, { id, address }]) => ({ cc, module: id, address })),
+			mods: this.mods.map(({ from, to, depth }) => ({ from, to, depth })),
 		};
 	}
 }

@@ -67,6 +67,11 @@ function knob(c, io) {
 		value = next;
 		show();
 	});
+	// A modulated knob keeps its pointer where the hand left it; a dot shows where the signal has it now.
+	io.onModulated((now) => {
+		dial.toggleAttribute("data-mod", now !== null);
+		if (now !== null) dial.style.setProperty("--mod", toTurn(now));
+	});
 	show();
 	return h("div", { class: "control" }, dial, h("span", {}, c.label), readout);
 }
@@ -78,7 +83,9 @@ function toggle(c, io) {
 		button.setAttribute("aria-pressed", String(on));
 		io.set(on ? c.max : c.min);
 	});
-	io.onValue((next) => button.setAttribute("aria-pressed", String(next === c.max)));
+	const show = (next) => button.setAttribute("aria-pressed", String(next === c.max));
+	io.onValue(show);
+	io.onModulated((now) => now !== null && show(now));
 	return h("div", { class: "control" }, button);
 }
 
@@ -91,6 +98,7 @@ function select(c, io) {
 	const el = h("select", { "aria-label": c.label }, ...options);
 	el.addEventListener("change", () => io.set(Number(el.value)));
 	io.onValue((next) => (el.value = next));
+	io.onModulated((now) => now !== null && (el.value = now));
 	return h("div", { class: "control wide" }, h("span", {}, c.label), el);
 }
 
@@ -124,16 +132,23 @@ export class RackView {
 		this.modulesEl = h("div", { class: "modules" });
 		this.svg = document.createElementNS(SVG, "svg");
 		this.svg.setAttribute("class", "cables");
-		root.replaceChildren(this.modulesEl, this.svg);
+		this.popover = h("div", { class: "popover", hidden: "" });
+		root.replaceChildren(this.modulesEl, this.svg, this.popover);
 		this.outputs = new Map();
 		this.values = new Map();
+		this.modulated = new Map();
+		// The cables and modulations listed in the box, and the drawn paths to find a cable by position.
+		this.selected = [];
+		this.paths = [];
+		rack.onModulated = (id, address, value) => this.modulated.get(`${id} ${address}`)?.(value);
+		root.addEventListener("click", (e) => this.#select(e));
+		this.modulesEl.addEventListener("click", (e) => this.#tapControl(e), true);
 		// MIDI learn: while learning, a tap picks the control that the next controller move binds.
 		this.learning = false;
 		this.learnTarget = null;
 		rack.onOutput = (id, address, value) => this.outputs.get(`${id} ${address}`)?.(value);
 		new ResizeObserver(() => this.draw()).observe(this.modulesEl);
 		this.modulesEl.addEventListener("pointerdown", (e) => this.#pressJack(e));
-		this.modulesEl.addEventListener("dblclick", (e) => this.#unplug(e));
 		this.modulesEl.addEventListener("pointerdown", (e) => this.#pickLearnTarget(e), true);
 		this.modulesEl.addEventListener("dblclick", (e) => this.#forget(e), true);
 	}
@@ -171,6 +186,7 @@ export class RackView {
 	render() {
 		this.outputs.clear();
 		this.values.clear();
+		this.modulated.clear();
 		this.root.classList.toggle("learning", this.learning);
 		this.modulesEl.replaceChildren(...[...this.rack.modules.values()].map((inst) => this.#panel(inst)));
 		this.draw();
@@ -184,6 +200,7 @@ export class RackView {
 			poke: (v) => this.rack.poke(id, c.address, v),
 			onOutput: (fn) => this.outputs.set(`${id} ${c.address}`, fn),
 			onValue: (fn) => this.values.set(`${id} ${c.address}`, fn),
+			onModulated: (fn) => this.modulated.set(`${id} ${c.address}`, fn),
 		});
 		const close = h("button", { class: "close", title: "Modul entfernen", "aria-label": `${def.name} entfernen` }, "×");
 		close.addEventListener("click", () => {
@@ -236,9 +253,17 @@ export class RackView {
 		return [clientX - base.left + this.root.scrollLeft, clientY - base.top + this.root.scrollTop];
 	}
 
-	#center(ref) {
-		const r = this.#jackEl(ref).getBoundingClientRect();
+	#centerOf(el) {
+		const r = el.getBoundingClientRect();
 		return this.#point(r.left + r.width / 2, r.top + r.height / 2);
+	}
+
+	#center(ref) {
+		return this.#centerOf(this.#jackEl(ref));
+	}
+
+	#controlEl([id, address]) {
+		return this.modulesEl.querySelector(`.module[data-id="${id}"] .control[data-address="${address}"]`);
 	}
 
 	draw(loose) {
@@ -252,9 +277,15 @@ export class RackView {
 			return el;
 		};
 		const kindOf = ([id, port]) => this.rack.modules.get(id).def.outputs[port].kind;
-		const paths = this.rack.cables.map(({ from, to }) =>
-			path(this.#center({ id: from[0], dir: "out", port: from[1] }), this.#center({ id: to[0], dir: "in", port: to[1] }), kindOf(from)),
-		);
+		const start = ([id, port]) => this.#center({ id, dir: "out", port });
+		this.paths = [
+			...this.rack.cables.map((cable) => ({ item: cable, el: path(start(cable.from), this.#center({ id: cable.to[0], dir: "in", port: cable.to[1] }), kindOf(cable.from)) })),
+			...this.rack.mods.map((mod) => ({ item: mod, el: path(start(mod.from), this.#centerOf(this.#controlEl(mod.to).firstChild), `${kindOf(mod.from)} mod`) })),
+		];
+		this.selected = this.selected.filter((item) => this.paths.some((entry) => entry.item === item));
+		this.popover.hidden = !this.selected.length;
+		for (const { item, el } of this.paths) el.classList.toggle("selected", this.selected.includes(item));
+		const paths = this.paths.map(({ el }) => el);
 		if (loose) paths.push(path(this.#center(loose.anchor), this.#point(loose.x, loose.y), "loose"));
 		this.svg.replaceChildren(...paths);
 		for (const el of this.modulesEl.querySelectorAll(".jack.armed")) el.classList.remove("armed");
@@ -299,8 +330,10 @@ export class RackView {
 			anchor = null;
 			if (e.type !== "pointerup") return this.draw();
 			if (!dragged) return this.#tap(this.#ref(jackEl));
-			const target = document.elementFromPoint(e.clientX, e.clientY)?.closest(".jack");
+			const under = document.elementFromPoint(e.clientX, e.clientY);
+			const target = under?.closest(".jack");
 			if (target) this.#join(dragged, this.#ref(target));
+			else this.#modulate(dragged, under?.closest(".control[data-address]"));
 			this.draw();
 		};
 		jackEl.addEventListener("pointermove", move);
@@ -323,22 +356,79 @@ export class RackView {
 		this.rack.connect([out.id, out.port], [input.id, input.port]);
 	}
 
-	#tap(ref) {
-		const same = this.armed && this.armed.id === ref.id && this.armed.dir === ref.dir && this.armed.port === ref.port;
-		if (this.armed && this.armed.dir !== ref.dir) {
-			this.#join(this.armed, ref);
-			this.armed = null;
-		} else this.armed = same ? null : ref;
-		this.hint(this.armed ? "Buchse gewählt. Jetzt die Buchse am anderen Ende antippen, auch nach dem Scrollen. Nochmal antippen bricht ab." : "");
+	// A cable dropped on a knob, switch or menu makes its signal move that control.
+	#modulate(out, controlEl) {
+		if (!controlEl || out.dir !== "out") return;
+		const to = [controlEl.closest(".module").dataset.id, controlEl.dataset.address];
+		this.rack.modulate([out.id, out.port], to).then(
+			() => this.draw(),
+			(err) => this.hint(err.message),
+		);
+	}
+
+	#tapControl(e) {
+		const controlEl = this.armed?.dir === "out" && e.target.closest(".control[data-address]");
+		if (!controlEl) return;
+		e.stopPropagation();
+		e.preventDefault();
+		this.#modulate(this.armed, controlEl);
+		this.armed = null;
+		this.selected = [];
+		this.hint("");
 		this.draw();
 	}
 
-	#unplug(e) {
-		const jackEl = e.target.closest(".jack");
-		if (!jackEl) return;
-		const { id, dir, port } = this.#ref(jackEl);
-		const end = dir === "out" ? "from" : "to";
-		for (const cable of this.rack.cables.filter((c) => c[end][0] === id && c[end][1] === port)) this.rack.disconnect(cable);
+	// A tap on a cable, or on a jack that has cables, lists those cables in a small box:
+	// one button each to remove exactly that cable, and for a modulation how far it moves the knob.
+	#select(e) {
+		if (e.target.closest(".popover, .jack")) return;
+		const [x, y] = this.#point(e.clientX, e.clientY);
+		const reach = (el) => {
+			const length = el.getTotalLength();
+			let best = Infinity;
+			for (let i = 0; i <= 60; i++) {
+				const p = el.getPointAtLength((length * i) / 60);
+				best = Math.min(best, Math.hypot(p.x - x, p.y - y));
+			}
+			return best;
+		};
+		const onControl = e.target.closest(".control, button, select, .keys, .pads");
+		const near = onControl ? [] : this.paths.map((entry) => ({ ...entry, far: reach(entry.el) })).filter((entry) => entry.far < 14);
+		this.#list(near.sort((a, b) => a.far - b.far).map((entry) => entry.item), x, y);
+	}
+
+	#list(items, x, y) {
+		this.selected = items;
+		const name = (id) => this.rack.modules.get(id).def;
+		const rows = items.map((item) => {
+			const source = `${name(item.from[0]).name} ${name(item.from[0]).outputs[item.from[1]].name}`;
+			const target = item.tap ? name(item.to[0]).controls.find((c) => c.address === item.to[1]).label : name(item.to[0]).inputs[item.to[1]].name;
+			const remove = h("button", { "aria-label": "Kabel entfernen", title: "Kabel entfernen" }, "×");
+			remove.addEventListener("click", () => {
+				item.tap ? this.rack.unmodulate(item) : this.rack.disconnect(item);
+				this.#list(items.filter((other) => other !== item), x, y);
+			});
+			const row = h("div", { class: "row" }, h("span", {}, `${source} → ${name(item.to[0]).name} ${target}`), remove);
+			if (!item.tap) return row;
+			const depth = h("input", { type: "range", min: "-1", max: "1", step: "0.01", "aria-label": "Stärke und Richtung" });
+			depth.value = item.depth;
+			depth.addEventListener("input", () => this.rack.setDepth(item, Number(depth.value)));
+			return h("div", {}, row, h("label", {}, "Stärke und Richtung", depth));
+		});
+		this.popover.replaceChildren(...rows);
+		this.popover.style.left = `${Math.max(4, x - 110)}px`;
+		this.popover.style.top = `${y + 16}px`;
 		this.draw();
+	}
+
+	#tap(ref) {
+		const same = this.armed && this.armed.id === ref.id && this.armed.dir === ref.dir && this.armed.port === ref.port;
+		const connects = this.armed && this.armed.dir !== ref.dir;
+		if (connects) this.#join(this.armed, ref);
+		this.armed = connects || same ? null : ref;
+		this.hint(this.armed ? "Buchse gewählt. Jetzt die Buchse am anderen Ende antippen, auch nach dem Scrollen. Ein Ausgang geht auch auf einen Regler. Nochmal antippen bricht ab." : "");
+		const end = ref.dir === "out" ? "from" : "to";
+		const here = [...this.rack.cables, ...(ref.dir === "out" ? this.rack.mods : [])].filter((c) => c[end][0] === ref.id && c[end][1] === ref.port);
+		this.#list(this.armed ? here : [], ...this.#center(ref));
 	}
 }

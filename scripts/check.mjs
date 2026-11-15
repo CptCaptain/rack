@@ -151,6 +151,64 @@ try {
 	await page.waitForFunction(() => window.faustRack?.rack.modules.size, null, { timeout: 60_000 });
 	check((await cables()) === first.cables.length, "patch survives a reload (localStorage)");
 
+	// Modulation: a cable dropped on a knob makes the signal move that knob.
+	await page.evaluate((patch) => window.faustRack.openPatch(patch), {
+		format: "faust-rack/1",
+		modules: [{ id: "lfo1", type: "lfo", params: { "/lfo/Rate": 4 } }, { id: "vco1", type: "vco", params: {} }, { id: "output1", type: "output", params: {} }],
+		cables: [{ from: ["vco1", 0], to: ["output1", 0] }, { from: ["vco1", 1], to: ["output1", 0] }],
+	});
+	const knob = (address) => `.module[data-id="vco1"] .control[data-address="${address}"] .dial`;
+	const mods = () => page.evaluate(() => window.faustRack.rack.mods.map((m) => `${m.from.join(":")}>${m.to[1]}@${m.depth}`).join(" "));
+	await drag(await center(jack("lfo1", "out", 0)), await center(knob("/vco/Stimmung")));
+	await page.waitForFunction(() => window.faustRack.rack.mods.length === 1);
+	const moving = await page.evaluate(async () => {
+		const { rack } = window.faustRack;
+		const seen = new Set();
+		for (let i = 0; i < 30; i++) {
+			seen.add(rack.modules.get("vco1").node.getParamValue("/vco/Stimmung"));
+			await new Promise((r) => setTimeout(r, 30));
+		}
+		return { values: [...seen].sort((a, b) => a - b), base: rack.modules.get("vco1").params["/vco/Stimmung"] ?? "untouched" };
+	});
+	const dotted = await page.locator(`${knob("/vco/Stimmung")}[data-mod]`).count();
+	check(moving.values.length >= 5 && moving.values.every(Number.isInteger) && moving.values[0] >= -6 && moving.values.at(-1) <= 6 && moving.base === "untouched" && dotted === 1, `a cable dropped on a knob modulates it in whole steps, values ${moving.values.join(" ")}, knob itself ${moving.base}`);
+	await page.click(jack("lfo1", "out", 1));
+	await page.click(knob("/vco/Fein"));
+	await page.waitForFunction(() => window.faustRack.rack.mods.length === 2);
+	check(true, `tapping an output and then a knob modulates too: ${await mods()}`);
+
+	// Tapping a cable selects exactly that one. The point is on the cable, off every control and off the other cables.
+	const tapPath = async (index) => {
+		const point = await page.evaluate((index) => {
+			const { view } = window.faustRack;
+			const root = document.getElementById("rack").getBoundingClientRect();
+			const sample = (el) => Array.from({ length: 81 }, (_, i) => el.getPointAtLength((el.getTotalLength() * i) / 80));
+			const others = view.paths.filter((_, i) => i !== index).flatMap(({ el }) => sample(el));
+			for (const p of sample(view.paths[index].el)) {
+				const [x, y] = [root.left + p.x - document.getElementById("rack").scrollLeft, root.top + p.y - document.getElementById("rack").scrollTop];
+				const under = document.elementFromPoint(x, y);
+				if (under && !under.closest(".jack, .control, button, select") && others.every((o) => Math.hypot(o.x - p.x, o.y - p.y) > 20)) return [x, y];
+			}
+			return null;
+		}, index);
+		await page.mouse.click(...point);
+	};
+	await tapPath(2);
+	await page.locator(".popover input").fill("-0.5");
+	check(/@-0.5/.test(await mods()) && (await page.locator(".cables .selected").count()) === 1, `tapping a modulation cable opens its strength slider: ${await mods()}`);
+	await page.click(".popover .row button");
+	const stillMod = await mods();
+	check(stillMod === "lfo1:1>/vco/Fein@0.25" && (await page.evaluate(() => window.faustRack.rack.modules.get("vco1").node.getParamValue("/vco/Stimmung"))) === 0, `removing it leaves the other and puts the knob back: ${stillMod}`);
+	await page.click(jack("output1", "in", 0));
+	const listed = await page.locator(".popover .row span").allTextContents();
+	await page.click('.popover .row:has-text("Säge") button');
+	const left = await page.evaluate(() => window.faustRack.rack.cables.map((c) => `${c.from.join(":")}>${c.to.join(":")}`).join(" "));
+	check(listed.length === 2 && left === "vco1:0>output1:0", `a tap on an input with two cables lists both (${listed.join(" | ")}); removing one leaves ${left}`);
+	await page.click(jack("output1", "in", 0));
+	const stored = await page.evaluate(() => window.faustRack.rack.toJSON());
+	await page.evaluate((patch) => window.faustRack.openPatch(patch), stored);
+	check((await mods()) === stillMod, "a patch with a modulation loads again");
+
 	const tastatur = JSON.parse(readFileSync(`${dir}/patches/tastatur.json`, "utf8"));
 	const param = (id, address) => page.evaluate(([id, address]) => window.faustRack.rack.modules.get(id).params[address], [id, address]);
 	await page.click("#btn-midi");
