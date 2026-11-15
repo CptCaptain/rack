@@ -169,6 +169,13 @@ try {
 	const savedOrder = await page.evaluate(() => window.faustRack.rack.toJSON().modules.map((m) => m.id).join(" "));
 	check((await order()) === expected && savedOrder === expected && (await peak()) > 0.005, `the arrows reorder modules and the patch keeps playing: ${expected}`);
 
+	await drag(await center('.module[data-id="clock1"] header b'), await page.evaluate(() => {
+		const box = document.querySelector('.module[data-id="adsr1"]').getBoundingClientRect();
+		return [box.right - 20, box.top + 60];
+	}));
+	const dropped = (await order()).split(" ");
+	check(dropped.indexOf("clock1") === dropped.indexOf("adsr1") + 1, `dragging a module by its name drops it where the pointer is: ${dropped.join(" ")}`);
+
 	const dial = await center('.module[data-id="output1"] .dial');
 	await drag(dial, [dial[0], dial[1] - 60]);
 	const volume = await page.evaluate(() => Object.values(window.faustRack.rack.modules.get("output1").params)[0]);
@@ -241,6 +248,28 @@ try {
 	const stored = await page.evaluate(() => window.faustRack.rack.toJSON());
 	await page.evaluate((patch) => window.faustRack.openPatch(patch), stored);
 	check((await mods()) === stillMod, "a patch with a modulation loads again");
+
+	// Undo and redo. A module that stays is not rebuilt, so the sound goes on.
+	{
+		await page.evaluate((patch) => window.faustRack.openPatch(patch), first);
+		await page.waitForTimeout(700);
+		const state = () => page.evaluate(() => `${window.faustRack.rack.cables.length} cables, ${window.faustRack.rack.modules.size} modules`);
+		await page.evaluate(() => (window.keptNode = window.faustRack.rack.modules.get("clock1").node));
+		const start = await state();
+		await page.click('.module[data-id="vcf1"] .close');
+		await page.waitForTimeout(600);
+		const without = await state();
+		await page.keyboard.press("Control+z");
+		await page.waitForTimeout(600);
+		const undone = await state();
+		const kept = await page.evaluate(() => window.keptNode === window.faustRack.rack.modules.get("clock1").node);
+		await page.click("#btn-redo");
+		await page.waitForTimeout(600);
+		const redone = await state();
+		await page.click("#btn-undo");
+		await page.waitForTimeout(600);
+		check(without !== start && undone === start && kept && redone === without && (await state()) === start, `undo brings a removed module back with its cables and redo removes it again: ${start} -> ${without} -> ${undone} -> ${redone}`);
+	}
 
 	// Recording: the button records what plays and hands over a WAV file.
 	{

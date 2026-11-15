@@ -171,6 +171,7 @@ export class RackView {
 		rack.onOutput = (id, address, value) => this.outputs.get(`${id} ${address}`)?.(value);
 		new ResizeObserver(() => this.draw()).observe(this.modulesEl);
 		this.modulesEl.addEventListener("pointerdown", (e) => this.#pressJack(e));
+		this.modulesEl.addEventListener("pointerdown", (e) => this.#dragModule(e));
 		this.modulesEl.addEventListener("pointerdown", (e) => this.#pickLearnTarget(e), true);
 		this.modulesEl.addEventListener("dblclick", (e) => this.#forget(e), true);
 	}
@@ -348,6 +349,46 @@ export class RackView {
 		return { id: jackEl.dataset.module, dir: jackEl.dataset.dir, port: Number(jackEl.dataset.port) };
 	}
 
+	// Dragging a module by its name moves it to where it is dropped: before the module under
+	// the pointer if the pointer is in its first half, after it otherwise.
+	#dragModule(down) {
+		const handle = down.target.closest(".module header b");
+		if (!handle) return;
+		const section = handle.closest(".module");
+		handle.setPointerCapture(down.pointerId);
+		let target = null;
+		const mark = (el, before) => {
+			for (const other of this.modulesEl.children) other.classList.remove("drop-before", "drop-after");
+			target = el && el !== section ? { el, before } : null;
+			if (target) el.classList.add(before ? "drop-before" : "drop-after");
+		};
+		const move = (e) => {
+			if (!section.classList.contains("dragging") && Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < 8) return;
+			section.classList.add("dragging");
+			const over = document.elementFromPoint(e.clientX, e.clientY)?.closest(".module");
+			if (!over) return mark(null);
+			const box = over.getBoundingClientRect();
+			// Side by side, left and right halves decide. Stacked, as on a phone, upper and lower halves do.
+			const stacked = box.width > this.modulesEl.clientWidth * 0.6;
+			mark(over, stacked ? e.clientY < box.top + box.height / 2 : e.clientX < box.left + box.width / 2);
+		};
+		const end = () => {
+			handle.removeEventListener("pointermove", move);
+			handle.removeEventListener("pointerup", end);
+			handle.removeEventListener("pointercancel", end);
+			section.classList.remove("dragging");
+			if (!target) return;
+			const order = [...this.modulesEl.children].filter((el) => el !== section);
+			const index = order.indexOf(target.el) + (target.before ? 0 : 1);
+			mark(null);
+			this.rack.move(section.dataset.id, index - [...this.rack.modules.keys()].indexOf(section.dataset.id));
+			this.render();
+		};
+		handle.addEventListener("pointermove", move);
+		handle.addEventListener("pointerup", end);
+		handle.addEventListener("pointercancel", end);
+	}
+
 	// A jack takes two gestures. A drag pulls a cable to another jack. A tap takes a cable into
 	// the hand, and a tap on a jack of the other kind plugs it, with any scrolling in between.
 	#pressJack(down) {
@@ -505,7 +546,13 @@ export class RackView {
 				box.active = index;
 				this.draw();
 			};
-			row.addEventListener("pointerenter", choose);
+			// Only a pointer that really moved chooses. When the list is rebuilt under a resting
+			// mouse, the browser reports a move at the same spot, and that must not undo an arrow key.
+			row.addEventListener("pointermove", (e) => {
+				const at = `${e.clientX} ${e.clientY}`;
+				if (at !== this.pointerAt) choose();
+				this.pointerAt = at;
+			});
 			row.addEventListener("click", choose);
 			if (!item.tap) return row;
 			const depth = h("input", { type: "range", min: "-1", max: "1", step: "0.01", "aria-label": "Stärke und Richtung" });
