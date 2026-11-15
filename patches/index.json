@@ -10,6 +10,11 @@
 		"description": "Zum Selberspielen: zwei Oszillatoren, Filter, Hall. Tasten A bis L."
 	},
 	{
+		"file": "akkorde.json",
+		"name": "Akkorde",
+		"description": "Vierstimmig spielen: mehrere Tasten zugleich drücken, zum Beispiel A, D und G."
+	},
+	{
 		"file": "drone.json",
 		"name": "Drone",
 		"description": "Ein stehender, langsam atmender Klang. Kein Takt, nur zuhören und drehen."

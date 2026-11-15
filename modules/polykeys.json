@@ -1,0 +1,25 @@
+{
+  "name": "Poly Keyboard",
+  "group": "Spielen und Takt",
+  "color": "#e8e4d8",
+  "widget": "keyboard",
+  "voices": 4,
+  "columns": 2,
+  "display": "none",
+  "description": "Tastatur für Akkorde: bis zu vier Töne gleichzeitig. Alles, was dahinter hängt, läuft automatisch vierstimmig: VCO, Filter, Hüllkurve, VCA.",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "Pitch",
+      "kind": "cv"
+    },
+    {
+      "name": "Gate",
+      "kind": "gate"
+    },
+    {
+      "name": "Vel",
+      "kind": "cv"
+    }
+  ]
+}

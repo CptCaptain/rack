@@ -1,4 +1,5 @@
 import { clamp, travel } from "./controls.js";
+import { POLY } from "./faust.js";
 
 export const FORMAT = "faust-rack/1";
 // Muting fades over this long, so cutting a sounding module does not click.
@@ -41,13 +42,17 @@ export class Rack {
 	#external;
 	#taps;
 
-	constructor(ctx, defs, { onChange = () => {}, onOutput = () => {}, onRemove = () => {}, onModulated = () => {} } = {}) {
+	constructor(ctx, defs, { onChange = () => {}, onOutput = () => {}, onRemove = () => {}, onModulated = () => {}, onRebuilt = () => {} } = {}) {
 		this.ctx = ctx;
 		this.defs = defs;
 		this.onChange = onChange;
 		this.onOutput = onOutput;
 		this.onRemove = onRemove;
 		this.onModulated = onModulated;
+		this.onRebuilt = onRebuilt;
+		// Resolves when every module has the number of voices its cables call for.
+		this.settled = Promise.resolve();
+		this.batch = false;
 		this.modules = new Map();
 		this.cables = [];
 		// A modulation moves a knob with a signal: { from: [id, port], to: [id, address], depth, tap, signal }.
@@ -83,17 +88,20 @@ export class Rack {
 		return this.#external;
 	}
 
-	async #node(def) {
+	async #node(def, voices) {
 		const external = def.microphone ? await this.#openExternal() : null;
-		return [await def.generator.createNode(this.ctx, def.id), external];
+		const generator = voices > def.voices ? await def.perVoice() : def.generator;
+		return [await generator.createNode(this.ctx, def.id), external];
 	}
 
-	#wire(def, id, [node, external]) {
+	// A module with several voices has each jack once per voice: channel = voice * jacks + jack.
+	#wire(def, id, [node, external], voices) {
+		const outputs = def.outputs.length * voices;
 		// Everything a module sends out passes its mute gain: cables, modulations and the speakers.
-		const mute = new GainNode(this.ctx, { channelCount: Math.max(1, def.speakers ? 2 : def.outputs.length), channelCountMode: "explicit", channelInterpretation: "discrete" });
-		const inst = { id, def, node, external, mute, muted: false, params: {}, merger: null, splitter: null };
+		const mute = new GainNode(this.ctx, { channelCount: Math.max(1, def.speakers ? 2 : outputs), channelCountMode: "explicit", channelInterpretation: "discrete" });
+		const inst = { id, def, node, external, mute, voices, muted: false, params: {}, merger: null, splitter: null };
 		node.connect(mute);
-		const inputs = external ? 2 : def.inputs.length;
+		const inputs = external ? 2 : def.inputs.length * voices;
 		if (inputs) {
 			inst.merger = new ChannelMergerNode(this.ctx, { numberOfInputs: inputs });
 			for (let port = 0; port < inputs; port++) {
@@ -102,20 +110,21 @@ export class Rack {
 			}
 			inst.merger.connect(node);
 		}
-		if (def.outputs.length) {
-			inst.splitter = new ChannelSplitterNode(this.ctx, { numberOfOutputs: def.outputs.length });
+		if (outputs) {
+			inst.splitter = new ChannelSplitterNode(this.ctx, { numberOfOutputs: outputs });
 			mute.connect(inst.splitter);
 		}
 		if (def.speakers) mute.connect(this.analyser);
 		node.connect(this.sink);
 		// One analyser per output for the live displays (displays.js), behind the mute so a muted
 		// module shows nothing. They are native nodes: the displays add no code to the audio thread.
-		const tap = (source, port) => {
+		const tap = (source, ports) => {
 			const analyser = new AnalyserNode(this.ctx, { fftSize: 1024 });
-			source.connect(analyser, port);
+			for (const port of ports) source.connect(analyser, port);
 			return analyser;
 		};
-		inst.taps = def.speakers ? [tap(mute, 0)] : def.outputs.map((_, port) => tap(inst.splitter, port));
+		const everyVoice = (port) => Array.from({ length: voices }, (_, voice) => voice * def.outputs.length + port);
+		inst.taps = def.speakers ? [tap(mute, [0])] : def.outputs.map((_, port) => tap(inst.splitter, everyVoice(port)));
 		node.setOutputParamHandler((address, value) => this.onOutput(id, address, value));
 		return inst;
 	}
@@ -135,10 +144,10 @@ export class Rack {
 	async add(type, { id, params = {}, muted = false } = {}) {
 		const def = this.defs.get(type);
 		if (!def) throw new Error(`Unbekanntes Modul „${type}“`);
-		const node = await this.#node(def);
+		const node = await this.#node(def, def.voices);
 		if (id === undefined) for (let n = 1; this.modules.has((id = `${type}${n}`)); n++);
 		if (this.modules.has(id)) throw new Error(`Modul-ID „${id}“ gibt es schon`);
-		this.modules.set(id, this.#wire(def, id, node));
+		this.modules.set(id, this.#wire(def, id, node, def.voices));
 		if (muted) this.setMuted(id, true, 0);
 		for (const [address, value] of Object.entries(params)) this.setParam(id, address, value);
 		this.onChange();
@@ -154,6 +163,7 @@ export class Rack {
 		this.#unwire(inst);
 		this.modules.delete(id);
 		this.onRemove(id);
+		this.#resettle();
 		this.onChange();
 	}
 
@@ -183,30 +193,67 @@ export class Rack {
 	// Swaps every instance of a recompiled module in place. Knob values and
 	// cables survive where the new version still has that knob or jack.
 	async update(def) {
-		for (const old of [...this.modules.values()].filter((inst) => inst.def.id === def.id)) {
-			const node = await this.#node(def);
-			if (this.modules.get(old.id) !== old) {
-				node[0].destroy();
-				continue;
-			}
-			const cables = this.#cablesOf(old.id);
-			for (const cable of cables) this.disconnect(cable);
-			const mods = this.#modsOf(old.id);
-			for (const mod of mods) this.unmodulate(mod);
-			this.#unwire(old);
-			this.modules.set(old.id, this.#wire(def, old.id, node));
-			if (old.muted) this.setMuted(old.id, true, 0);
-			for (const [address, value] of Object.entries(old.params))
-				if (def.controls.some((c) => c.address === address)) this.setParam(old.id, address, value);
-			for (const { from, to } of cables)
-				if (this.modules.get(from[0]).def.outputs[from[1]] && this.modules.get(to[0]).def.inputs[to[1]])
-					this.connect(from, to);
-			for (const [cc, target] of this.midi)
-				if (target.id === old.id && !def.controls.some((c) => c.address === target.address)) this.midi.delete(cc);
-			for (const { from, to, depth } of mods)
-				if (this.modules.get(from[0]).def.outputs[from[1]] && this.#control(to)) await this.modulate(from, to, depth);
-		}
+		for (const old of [...this.modules.values()].filter((inst) => inst.def.id === def.id)) await this.#rebuild(old, def, def.spreads ? old.voices : def.voices);
+		this.#resettle();
 		this.onChange();
+	}
+
+	// Builds a module again, from another version of its program or with another number of
+	// voices, and puts back its knobs, its mute, its cables and its modulations.
+	async #rebuild(old, def, voices) {
+		const node = await this.#node(def, voices);
+		if (this.modules.get(old.id) !== old) return node[0].destroy();
+		const batch = this.batch;
+		this.batch = true;
+		try {
+			await this.#swap(old, def, voices, node);
+		} finally {
+			this.batch = batch;
+		}
+	}
+
+	async #swap(old, def, voices, node) {
+		const cables = this.#cablesOf(old.id);
+		for (const cable of cables) this.disconnect(cable);
+		const mods = this.#modsOf(old.id);
+		for (const mod of mods) this.unmodulate(mod);
+		this.#unwire(old);
+		this.modules.set(old.id, this.#wire(def, old.id, node, voices));
+		if (old.muted) this.setMuted(old.id, true, 0);
+		for (const [address, value] of Object.entries(old.params))
+			if (def.controls.some((c) => c.address === address)) this.setParam(old.id, address, value);
+		for (const { from, to } of cables)
+			if (this.modules.get(from[0]).def.outputs[from[1]] && this.modules.get(to[0]).def.inputs[to[1]]) this.connect(from, to);
+		for (const [cc, target] of this.midi)
+			if (target.id === old.id && !def.controls.some((c) => c.address === target.address)) this.midi.delete(cc);
+		for (const { from, to, depth } of mods)
+			if (this.modules.get(from[0]).def.outputs[from[1]] && this.#control(to)) await this.modulate(from, to, depth);
+	}
+
+	// Polyphony spreads along the cables: a module that can run once per voice does so as soon
+	// as a polyphonic module feeds it. Everything else adds the voices up at its input.
+	async #settle() {
+		const voices = new Map([...this.modules].map(([id, inst]) => [id, inst.def.voices]));
+		for (let spread = true; spread; ) {
+			spread = false;
+			for (const { from, to } of this.cables) {
+				if (!this.modules.get(to[0]).def.spreads || voices.get(from[0]) === 1 || voices.get(to[0]) > 1) continue;
+				voices.set(to[0], POLY);
+				spread = true;
+			}
+		}
+		let rebuilt = false;
+		for (const [id, wanted] of voices) {
+			const inst = this.modules.get(id);
+			if (!inst || inst.voices === wanted) continue;
+			await this.#rebuild(inst, inst.def, wanted);
+			rebuilt = true;
+		}
+		if (rebuilt) this.onRebuilt();
+	}
+
+	#resettle() {
+		if (!this.batch) this.settled = this.settled.then(() => this.#settle()).catch((err) => console.error(err.message));
 	}
 
 	connect(from, to) {
@@ -216,16 +263,21 @@ export class Rack {
 		const src = this.modules.get(from[0]);
 		const dst = this.modules.get(to[0]);
 		if (!src?.def.outputs[from[1]] || !dst?.def.inputs[to[1]]) throw new Error("Diese Buchse gibt es nicht");
-		const cable = { from: [...from], to: [...to], delay: null };
-		if (this.#reaches(to[0], from[0])) {
-			// Web Audio mutes a loop that has no DelayNode in it.
-			cable.delay = new DelayNode(this.ctx, { maxDelayTime: 1, delayTime: 128 / this.ctx.sampleRate });
-			src.splitter.connect(cable.delay, from[1]);
-			cable.delay.connect(dst.merger, 0, to[1]);
-		} else {
-			src.splitter.connect(dst.merger, from[1], to[1]);
-		}
+		// Web Audio mutes a loop that has no DelayNode in it.
+		const loop = this.#reaches(to[0], from[0]);
+		// One link per voice. A single voice feeds every voice of a polyphonic module, and all
+		// voices of a polyphonic module add up in a module with one voice.
+		const links = Array.from({ length: Math.max(src.voices, dst.voices) }, (_, voice) => {
+			const out = Math.min(voice, src.voices - 1) * src.def.outputs.length + from[1];
+			const into = Math.min(voice, dst.voices - 1) * dst.def.inputs.length + to[1];
+			const delay = loop ? new DelayNode(this.ctx, { maxDelayTime: 1, delayTime: 128 / this.ctx.sampleRate }) : null;
+			if (delay) src.splitter.connect(delay, out).connect(dst.merger, 0, into);
+			else src.splitter.connect(dst.merger, out, into);
+			return { out, into, delay };
+		});
+		const cable = { from: [...from], to: [...to], loop, links };
 		this.cables.push(cable);
+		this.#resettle();
 		this.onChange();
 		return cable;
 	}
@@ -235,13 +287,14 @@ export class Rack {
 		if (index < 0) return;
 		const src = this.modules.get(cable.from[0]);
 		const dst = this.modules.get(cable.to[0]);
-		if (cable.delay) {
-			src.splitter.disconnect(cable.delay, cable.from[1]);
-			cable.delay.disconnect();
-		} else {
-			src.splitter.disconnect(dst.merger, cable.from[1], cable.to[1]);
+		for (const { out, into, delay } of cable.links) {
+			if (delay) {
+				src.splitter.disconnect(delay, out);
+				delay.disconnect();
+			} else src.splitter.disconnect(dst.merger, out, into);
 		}
 		this.cables.splice(index, 1);
+		this.#resettle();
 		this.onChange();
 	}
 
@@ -313,7 +366,7 @@ export class Rack {
 			if (id === goal) return true;
 			if (seen.has(id)) return false;
 			seen.add(id);
-			return this.cables.some((c) => !c.delay && c.from[0] === id && visit(c.to[0]));
+			return this.cables.some((c) => !c.loop && c.from[0] === id && visit(c.to[0]));
 		};
 		return visit(start);
 	}
@@ -349,17 +402,34 @@ export class Rack {
 
 	async load(data) {
 		const patch = parsePatch(data, this.defs);
-		for (const id of [...this.modules.keys()]) this.remove(id);
-		for (const m of patch.modules) await this.add(m.type, m);
-		for (const c of patch.cables) this.connect(c.from, c.to);
-		for (const m of patch.midi) this.learn(m.cc, m.module, m.address);
-		for (const m of patch.mods) await this.modulate(m.from, m.to, m.depth);
+		this.batch = true;
+		try {
+			for (const id of [...this.modules.keys()]) this.remove(id);
+			for (const m of patch.modules) await this.add(m.type, m);
+			for (const c of patch.cables) this.connect(c.from, c.to);
+			for (const m of patch.midi) this.learn(m.cc, m.module, m.address);
+			for (const m of patch.mods) await this.modulate(m.from, m.to, m.depth);
+		} finally {
+			this.batch = false;
+		}
+		await this.#settle();
 	}
 
 	// Turns the rack into the given patch by changing only what differs. Modules that stay keep
 	// running, so undo does not interrupt the sound the way loading a patch does.
 	async reconcile(data) {
 		const patch = parsePatch(data, this.defs);
+		this.batch = true;
+		try {
+			await this.#reconcile(patch);
+		} finally {
+			this.batch = false;
+		}
+		await this.#settle();
+		this.onChange();
+	}
+
+	async #reconcile(patch) {
 		const wanted = new Map(patch.modules.map((m) => [m.id, m]));
 		for (const [id, inst] of [...this.modules]) if (wanted.get(id)?.type !== inst.def.id) this.remove(id);
 		for (const m of patch.modules) {
@@ -384,7 +454,6 @@ export class Rack {
 		}
 		this.midi.clear();
 		for (const m of patch.midi) this.learn(m.cc, m.module, m.address);
-		this.onChange();
 	}
 
 	toJSON() {

@@ -34,6 +34,7 @@ const probes = [
 	["beat track 1 plays its default steps 1, 5, 9, 13", patch(["clock1 Tempo=118", "beat1"], ["clock1.1 > beat1.0", "beat1.0 > output1.0"]), (r) => r.edges, between(4, 4)],
 	["sequencer with every second step a rest sends 8 of 16 gates", patch(["clock1 Tempo=118", "seq1 rests=170"], ["clock1.1 > seq1.0", "seq1.1 > output1.0"]), (r) => r.edges, between(8, 8)],
 	["sequencer with every step held sends one long gate", patch(["clock1 Tempo=118", "seq1 holds=255"], ["clock1.1 > seq1.0", "seq1.1 > output1.0"]), (r) => r.edges, between(1, 1)],
+	["two held keys of the Poly Keyboard sound as two pitches, C4 and G4, and no E4", { format: "faust-rack/1", modules: [{ id: "polykeys1", type: "polykeys", params: { "/polykeys/gate1": 1, "/polykeys/gate2": 1, "/polykeys/note2": 67 } }, { id: "vco1", type: "vco", params: {} }, { id: "vca1", type: "vca", params: {} }, { id: "output1", type: "output", params: { "/output/Volume": 0.5, "/output/Limiter": 0 } }], cables: [{ from: ["polykeys1", 0], to: ["vco1", 0] }, { from: ["vco1", 0], to: ["vca1", 0] }, { from: ["polykeys1", 1], to: ["vca1", 1] }, { from: ["vca1", 0], to: ["output1", 0] }] }, (r) => Math.min(r.tones[0], r.tones[2]) / Math.max(r.tones[1], 1e-9), between(100, Infinity)],
 	["random holds a new value per clock", patch(["clock1 Tempo=118", "random1 Bereich=0.5"], ["clock1.1 > random1.0", "random1.0 > output1.0"]), (r) => r.levels, between(13, 16)],
 	["quantizer in major leaves only major-scale notes", patch(["lfo1 Rate=0.5", "quantizer1 Skala=0"], ["lfo1.0 > quantizer1.0", "quantizer1.0 > output1.0"]), (r) => r.offScale, between(0, 0)],
 	["quantizer passes several different notes", patch(["lfo1 Rate=0.5", "quantizer1 Skala=0"], ["lfo1.0 > quantizer1.0", "quantizer1.0 > output1.0"]), (r) => r.levels, between(10, 15)],
@@ -98,7 +99,14 @@ const render = (data, major) =>
 			for (let lag = 40; lag < 400; lag++) if (corr(lag) > corr(best)) best = lag;
 			const [a, b, c] = [corr(best - 1), corr(best), corr(best + 1)];
 			const hertz = rate / (best + (a - c) / (2 * (a - 2 * b + c)));
-			return { peak: peakOf(settled), peakRight: peakOf(right.subarray(rate / 2)), finite: left.every(Number.isFinite), edges, levels: levels.size, offScale, hertz };
+			// How strongly each of C4, E4 and G4 is in the sound (Goertzel).
+			const tones = [261.63, 329.63, 392.0].map((hz) => {
+				const k = 2 * Math.cos((2 * Math.PI * hz) / rate);
+				let [a, b] = [0, 0];
+				for (const v of settled) [a, b] = [v + k * a - b, a];
+				return Math.sqrt(a * a + b * b - k * a * b) / settled.length;
+			});
+			return { tones, peak: peakOf(settled), peakRight: peakOf(right.subarray(rate / 2)), finite: left.every(Number.isFinite), edges, levels: levels.size, offScale, hertz };
 		},
 		{ data, major },
 	);

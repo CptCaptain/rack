@@ -15,5 +15,6 @@
       "name": "Out",
       "kind": "audio"
     }
-  ]
+  ],
+  "mono": true
 }

@@ -82,7 +82,7 @@ try {
 	for (const { file, name } of examples.toReversed()) {
 		const data = JSON.parse(readFileSync(`${dir}/patches/${file}`, "utf8"));
 		await page.evaluate((patch) => window.faustRack.openPatch(patch), data);
-		const played = data.modules.some((m) => m.type === "keyboard");
+		const played = data.modules.some((m) => m.type === "keyboard" || m.type === "polykeys");
 		if (played) await page.keyboard.down("d");
 		await page.waitForTimeout(800);
 		const level = await peak();
@@ -248,6 +248,23 @@ try {
 	const stored = await page.evaluate(() => window.faustRack.rack.toJSON());
 	await page.evaluate((patch) => window.faustRack.openPatch(patch), stored);
 	check((await mods()) === stillMod, "a patch with a modulation loads again");
+
+	// Polyphony: a cable from the Poly Keyboard makes the modules behind it run once per voice.
+	{
+		await page.evaluate((patch) => window.faustRack.openPatch(patch), JSON.parse(readFileSync(`${dir}/patches/akkorde.json`, "utf8")));
+		const voices = () => page.evaluate(() => [...window.faustRack.rack.modules.values()].map((m) => `${m.id}:${m.voices}`).join(" "));
+		const chord = await voices();
+		await page.keyboard.down("a");
+		await page.keyboard.down("d");
+		await page.keyboard.down("g");
+		await page.waitForTimeout(500);
+		const lit = await page.locator(".keys i.on").count();
+		const loud = await peak();
+		for (const key of ["a", "d", "g"]) await page.keyboard.up(key);
+		await page.evaluate(() => { const { rack } = window.faustRack; rack.disconnect(rack.cables.find((c) => c.from[0] === "polykeys1" && c.to[0] === "vco1")); });
+		await page.evaluate(() => window.faustRack.rack.settled);
+		check(chord === "polykeys1:4 vco1:4 adsr1:4 vcf1:4 vca1:4 reverb1:1 output1:1" && lit === 3 && loud > 0.02 && /vco1:1 adsr1:4 vcf1:4/.test(await voices()) && (await page.locator(".module .voices").count()) === 4, `a chord of three keys sounds through four voices (${chord}), and a module goes back to one voice when the cable goes: ${await voices()}`);
+	}
 
 	// The Beat grid: a tap on a cell changes the track's pattern, and the patch keeps it.
 	{

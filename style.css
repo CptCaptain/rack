@@ -131,3 +131,6 @@ select { font: inherit; font-size: 11px; color: inherit; background: #111216; bo
 .grid button.now { outline: 2px solid var(--text); }
 .steps { display: grid; grid-template-columns: repeat(var(--cols), 58px); justify-content: center; justify-items: center; gap: 4px 2px; padding: 0 8px; }
 .steps button { min-width: 40px; min-height: 40px; padding: 0; }
+.module .voices { margin-right: 4px; padding: 0 5px; border-radius: 8px; background: var(--color); color: #000; font-size: 11px; font-weight: 700; }
+.cables .poly { stroke-width: 9; }
+.cables .poly.mod { stroke-width: 3; }

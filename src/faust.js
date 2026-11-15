@@ -6,6 +6,8 @@ import {
 } from "../vendor/faustwasm/index.js";
 
 const PORT_KINDS = ["audio", "cv", "gate"];
+// How many voices a polyphonic module runs.
+export const POLY = 4;
 
 async function fetchText(path) {
 	const res = await fetch(path, { cache: "no-cache" });
@@ -64,6 +66,15 @@ export async function compile(compiler, id, info, code) {
 	const dsp = JSON.parse(generator.factory.json);
 	const speakers = info.speakers === true;
 	const microphone = info.microphone === true;
+	// A module with "voices" is polyphonic by itself: its process has every jack once per voice,
+	// voice after voice. Its jacks are still named once.
+	const voices = Number(info.voices) || 1;
+	const controls = flatten(dsp.ui).map(parseControl);
+	const inputs = parsePorts(id, microphone ? [] : info.inputs, microphone ? 0 : dsp.inputs / voices, "Eingänge");
+	// Fed by a polyphonic module, a plain module runs once per voice too. That needs inputs to
+	// tell the voices apart, and nothing that exists only once: no meter, no widget, no speaker.
+	const spreads = voices === 1 && info.mono !== true && inputs.length > 0 && !speakers && !microphone && !info.widget && !controls.some((c) => c.type === "meter" || c.type === "leds");
+	let perVoice;
 	if (speakers && dsp.outputs !== 2) throw new Error(`${id}.dsp braucht für "speakers" genau 2 Ausgänge`);
 	if (microphone && dsp.inputs !== 2) throw new Error(`${id}.dsp braucht für "microphone" genau 2 Eingänge`);
 	return {
@@ -77,10 +88,21 @@ export async function compile(compiler, id, info, code) {
 		display: String(info.display ?? "scope"),
 		speakers,
 		microphone,
-		inputs: parsePorts(id, microphone ? [] : info.inputs, microphone ? 0 : dsp.inputs, "Eingänge"),
-		outputs: parsePorts(id, speakers ? [] : info.outputs, speakers ? 0 : dsp.outputs, "Ausgänge"),
-		controls: flatten(dsp.ui).map(parseControl),
+		voices,
+		spreads,
+		inputs,
+		outputs: parsePorts(id, speakers ? [] : info.outputs, speakers ? 0 : dsp.outputs / voices, "Ausgänge"),
+		controls,
 		generator,
+		// The same module once per voice, side by side in one program. Controls with the same
+		// name are one control in Faust, so all voices share the knobs.
+		perVoice: () =>
+			(perVoice ??= (async () => {
+				const copies = new FaustMonoDspGenerator();
+				if (!(await copies.compile(compiler, id, `voice = environment {\n${code}\n}.process;\nprocess = par(i, ${POLY}, voice);\n`, "-ftz 2")))
+					throw new Error(compiler.getErrorMessage() || `${id} lässt sich nicht mehrstimmig kompilieren`);
+				return copies;
+			})()),
 	};
 }
 

@@ -164,6 +164,7 @@ export class RackView {
 		addEventListener("keydown", (e) => e.key === "Escape" && this.#hold(null));
 		this.paths = [];
 		rack.onModulated = (id, address, value) => this.modulated.get(`${id} ${address}`)?.(value);
+		rack.onRebuilt = () => this.render();
 		root.addEventListener("click", (e) => this.#select(e));
 		this.modulesEl.addEventListener("click", (e) => this.#tapControl(e), true);
 		// MIDI learn: while learning, a tap picks the control that the next controller move binds.
@@ -262,7 +263,7 @@ export class RackView {
 		const address = (label) => def.controls.find((c) => c.label === label)?.address;
 		const widget = WIDGETS[def.widget]?.(def, {
 			id,
-			poke: (label, value) => this.rack.poke(id, address(label), value),
+			poke: (label, value) => address(label) && this.rack.poke(id, address(label), value),
 			// Like a knob: the value is part of the patch.
 			set: (label, value) => this.rack.setParam(id, address(label), value),
 			value: (label) => this.rack.modules.get(id).params[address(label)] ?? def.controls.find((c) => c.label === label).init,
@@ -274,7 +275,7 @@ export class RackView {
 		return h(
 			"section",
 			{ class: inst.muted ? "module muted" : "module", "data-id": id, style: `--color:${def.color};--cols:${def.columns}` },
-			h("header", { title: def.description }, h("b", {}, def.name), mute, mover("‹", "nach vorn", -1), mover("›", "nach hinten", 1), close),
+			h("header", { title: def.description }, h("b", {}, def.name), ...(inst.voices > 1 ? [h("span", { class: "voices", title: `${inst.voices} Stimmen` }, `×${inst.voices}`)] : []), mute, mover("‹", "nach vorn", -1), mover("›", "nach hinten", 1), close),
 			...(def.display === "none" || !inst.taps.length ? [] : [h("canvas", { class: "display" })]),
 			h("div", { class: "controls" }, ...controls),
 			...(widget ? [widget] : []),
@@ -316,7 +317,7 @@ export class RackView {
 		};
 		const kindOf = ([id, port]) => this.rack.modules.get(id).def.outputs[port].kind;
 		const start = ([id, port]) => this.#center({ id, dir: "out", port });
-		const kindOfLive = (from) => (this.rack.modules.get(from[0]).muted ? `${kindOf(from)} muted` : kindOf(from));
+		const kindOfLive = (from) => `${kindOf(from)}${this.rack.modules.get(from[0]).muted ? " muted" : ""}${this.rack.modules.get(from[0]).voices > 1 ? " poly" : ""}`;
 		this.paths = [
 			...this.rack.cables.map((cable) => ({ item: cable, el: path(start(cable.from), this.#center({ id: cable.to[0], dir: "in", port: cable.to[1] }), kindOfLive(cable.from)) })),
 			...this.rack.mods.map((mod) => ({ item: mod, el: path(start(mod.from), this.#centerOf(this.#controlEl(mod.to).firstChild), `${kindOfLive(mod.from)} mod`) })),

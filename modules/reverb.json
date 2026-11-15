@@ -19,5 +19,6 @@
       "kind": "audio"
     }
   ],
-  "group": "Effekte"
+  "group": "Effekte",
+  "mono": true
 }

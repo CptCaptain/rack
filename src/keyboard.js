@@ -44,14 +44,16 @@ export function keyboard(def, io) {
 	}
 
 	const held = [];
+	const light = (notes) => {
+		for (const [n, key] of keyEls) key.classList.toggle("on", notes.includes(n));
+	};
 	const sync = () => {
 		if (held.length) set("note", held.at(-1));
 		set("gate", held.length ? 1 : 0);
-		for (const [n, key] of keyEls) key.classList.toggle("on", held.includes(n));
+		light(held);
 	};
-	const board = {
-		el,
-		set,
+	// One voice: the newest key sounds, and letting go falls back to a key still held.
+	const mono = {
 		down(n, velocity) {
 			if (held.includes(n)) return;
 			held.push(n);
@@ -65,6 +67,30 @@ export function keyboard(def, io) {
 			sync();
 		},
 	};
+	// Several voices (controls gate1, note1, vel1, ...): each key gets the voice that has been
+	// free the longest. With every voice busy, a new key takes over the oldest one.
+	const voices = def.controls.filter((c) => /^gate\d+$/.test(c.label)).map((_, i) => ({ number: i + 1, note: null, since: 0 }));
+	let time = 0;
+	const poly = {
+		down(n, velocity) {
+			if (voices.some((v) => v.note === n)) return;
+			const byAge = [...voices].sort((a, b) => a.since - b.since);
+			const voice = byAge.find((v) => v.note === null) ?? byAge[0];
+			Object.assign(voice, { note: n, since: ++time });
+			set(`note${voice.number}`, n);
+			set(`vel${voice.number}`, velocity);
+			set(`gate${voice.number}`, 1);
+			light(voices.map((v) => v.note));
+		},
+		up(n) {
+			const voice = voices.find((v) => v.note === n);
+			if (!voice) return;
+			Object.assign(voice, { note: null, since: ++time });
+			set(`gate${voice.number}`, 0);
+			light(voices.map((v) => v.note));
+		},
+	};
+	const board = { el, set, ...(voices.length ? poly : mono) };
 	boards.add(board);
 
 	const fingers = new Map();

@@ -1,0 +1,147 @@
+{
+	"format": "faust-rack/1",
+	"modules": [
+		{
+			"id": "polykeys1",
+			"type": "polykeys",
+			"params": {}
+		},
+		{
+			"id": "vco1",
+			"type": "vco",
+			"params": {
+				"/vco/Oktave": -1
+			}
+		},
+		{
+			"id": "adsr1",
+			"type": "adsr",
+			"params": {
+				"/adsr/Attack": 0.02,
+				"/adsr/Decay": 0.5,
+				"/adsr/Sustain": 0.6,
+				"/adsr/Release": 0.8
+			}
+		},
+		{
+			"id": "vcf1",
+			"type": "vcf",
+			"params": {
+				"/vcf/Cutoff": 800,
+				"/vcf/Resonanz": 0.3,
+				"/vcf/CV-Anteil": 0.4
+			}
+		},
+		{
+			"id": "vca1",
+			"type": "vca",
+			"params": {}
+		},
+		{
+			"id": "reverb1",
+			"type": "reverb",
+			"params": {
+				"/reverb/Mix": 0.3
+			}
+		},
+		{
+			"id": "output1",
+			"type": "output",
+			"params": {
+				"/output/Volume": 0.3
+			}
+		}
+	],
+	"cables": [
+		{
+			"from": [
+				"polykeys1",
+				0
+			],
+			"to": [
+				"vco1",
+				0
+			]
+		},
+		{
+			"from": [
+				"polykeys1",
+				1
+			],
+			"to": [
+				"adsr1",
+				0
+			]
+		},
+		{
+			"from": [
+				"vco1",
+				1
+			],
+			"to": [
+				"vcf1",
+				0
+			]
+		},
+		{
+			"from": [
+				"adsr1",
+				0
+			],
+			"to": [
+				"vcf1",
+				1
+			]
+		},
+		{
+			"from": [
+				"vcf1",
+				0
+			],
+			"to": [
+				"vca1",
+				0
+			]
+		},
+		{
+			"from": [
+				"adsr1",
+				0
+			],
+			"to": [
+				"vca1",
+				1
+			]
+		},
+		{
+			"from": [
+				"vca1",
+				0
+			],
+			"to": [
+				"reverb1",
+				0
+			]
+		},
+		{
+			"from": [
+				"reverb1",
+				0
+			],
+			"to": [
+				"output1",
+				1
+			]
+		},
+		{
+			"from": [
+				"reverb1",
+				1
+			],
+			"to": [
+				"output1",
+				2
+			]
+		}
+	]
+}
