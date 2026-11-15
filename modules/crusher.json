@@ -1,0 +1,19 @@
+{
+  "name": "Crusher",
+  "group": "Effekte",
+  "color": "#9d4edd",
+  "columns": 2,
+  "description": "Bitcrusher: macht den Klang grob und kratzig wie ein alter Spielcomputer.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "audio"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

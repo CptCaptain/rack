@@ -1,0 +1,152 @@
+{
+	"format": "faust-rack/1",
+	"modules": [
+		{
+			"id": "clock1",
+			"type": "clock",
+			"params": {
+				"/clock/Tempo": 118
+			}
+		},
+		{
+			"id": "euclid1",
+			"type": "euclid",
+			"params": {
+				"/euclid/Schritte": 16,
+				"/euclid/Treffer": 2,
+				"/euclid/Dreh": 4
+			}
+		},
+		{
+			"id": "euclid2",
+			"type": "euclid",
+			"params": {
+				"/euclid/Schritte": 8,
+				"/euclid/Treffer": 5
+			}
+		},
+		{
+			"id": "kick1",
+			"type": "kick",
+			"params": {}
+		},
+		{
+			"id": "snare1",
+			"type": "snare",
+			"params": {}
+		},
+		{
+			"id": "hat1",
+			"type": "hat",
+			"params": {}
+		},
+		{
+			"id": "mixer1",
+			"type": "mixer",
+			"params": {
+				"/mixer/In_1": 0.9,
+				"/mixer/In_2": 0.6,
+				"/mixer/In_3": 0.35
+			}
+		},
+		{
+			"id": "output1",
+			"type": "output",
+			"params": {
+				"/output/Volume": 0.3
+			}
+		}
+	],
+	"cables": [
+		{
+			"from": [
+				"clock1",
+				0
+			],
+			"to": [
+				"kick1",
+				0
+			]
+		},
+		{
+			"from": [
+				"clock1",
+				2
+			],
+			"to": [
+				"euclid1",
+				0
+			]
+		},
+		{
+			"from": [
+				"euclid1",
+				0
+			],
+			"to": [
+				"snare1",
+				0
+			]
+		},
+		{
+			"from": [
+				"clock1",
+				1
+			],
+			"to": [
+				"euclid2",
+				0
+			]
+		},
+		{
+			"from": [
+				"euclid2",
+				0
+			],
+			"to": [
+				"hat1",
+				0
+			]
+		},
+		{
+			"from": [
+				"kick1",
+				0
+			],
+			"to": [
+				"mixer1",
+				0
+			]
+		},
+		{
+			"from": [
+				"snare1",
+				0
+			],
+			"to": [
+				"mixer1",
+				1
+			]
+		},
+		{
+			"from": [
+				"hat1",
+				0
+			],
+			"to": [
+				"mixer1",
+				2
+			]
+		},
+		{
+			"from": [
+				"mixer1",
+				0
+			],
+			"to": [
+				"output1",
+				0
+			]
+		}
+	]
+}

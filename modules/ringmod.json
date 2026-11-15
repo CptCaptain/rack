@@ -1,0 +1,23 @@
+{
+  "name": "Ringmod",
+  "group": "Formen und Mischen",
+  "color": "#9bc53d",
+  "columns": 1,
+  "description": "Multipliziert zwei Signale. Klingt metallisch und glockig.",
+  "inputs": [
+    {
+      "name": "A",
+      "kind": "audio"
+    },
+    {
+      "name": "B",
+      "kind": "audio"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

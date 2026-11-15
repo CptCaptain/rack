@@ -1,0 +1,140 @@
+{
+	"format": "faust-rack/1",
+	"modules": [
+		{
+			"id": "clock1",
+			"type": "clock",
+			"params": {
+				"/clock/Tempo": 96
+			}
+		},
+		{
+			"id": "random1",
+			"type": "random",
+			"params": {
+				"/random/Bereich": 1
+			}
+		},
+		{
+			"id": "quantizer1",
+			"type": "quantizer",
+			"params": {
+				"/quantizer/Skala": 3
+			}
+		},
+		{
+			"id": "pluck1",
+			"type": "pluck",
+			"params": {
+				"/pluck/Decay": 3,
+				"/pluck/Hell": 0.6
+			}
+		},
+		{
+			"id": "delay1",
+			"type": "delay",
+			"params": {
+				"/delay/Zeit": 469,
+				"/delay/Feedback": 0.45,
+				"/delay/Mix": 0.3
+			}
+		},
+		{
+			"id": "reverb1",
+			"type": "reverb",
+			"params": {
+				"/reverb/Dauer": 4,
+				"/reverb/Mix": 0.35
+			}
+		},
+		{
+			"id": "output1",
+			"type": "output",
+			"params": {
+				"/output/Volume": 0.4
+			}
+		}
+	],
+	"cables": [
+		{
+			"from": [
+				"clock1",
+				1
+			],
+			"to": [
+				"random1",
+				0
+			]
+		},
+		{
+			"from": [
+				"random1",
+				0
+			],
+			"to": [
+				"quantizer1",
+				0
+			]
+		},
+		{
+			"from": [
+				"quantizer1",
+				0
+			],
+			"to": [
+				"pluck1",
+				0
+			]
+		},
+		{
+			"from": [
+				"clock1",
+				1
+			],
+			"to": [
+				"pluck1",
+				1
+			]
+		},
+		{
+			"from": [
+				"pluck1",
+				0
+			],
+			"to": [
+				"delay1",
+				0
+			]
+		},
+		{
+			"from": [
+				"delay1",
+				0
+			],
+			"to": [
+				"reverb1",
+				0
+			]
+		},
+		{
+			"from": [
+				"reverb1",
+				0
+			],
+			"to": [
+				"output1",
+				1
+			]
+		},
+		{
+			"from": [
+				"reverb1",
+				1
+			],
+			"to": [
+				"output1",
+				2
+			]
+		}
+	]
+}

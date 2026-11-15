@@ -39,13 +39,16 @@ const openPatch = (data) =>
 
 function pick(title, items) {
 	const dialog = $("picker");
-	const entries = items.map(({ name, description, color, run }) => {
+	let lastGroup = "";
+	const entries = items.flatMap(({ name, description, color, group = "", run }) => {
 		const button = h("button", { style: `--color:${color ?? "transparent"}` }, h("b", {}, name), h("span", {}, description ?? ""));
 		button.addEventListener("click", () => {
 			dialog.close();
 			run();
 		});
-		return button;
+		const heading = group === lastGroup ? [] : [h("h3", {}, group)];
+		lastGroup = group;
+		return [...heading, button];
 	});
 	dialog.replaceChildren(h("h2", {}, title), ...entries, h("form", { method: "dialog" }, h("button", {}, "Abbrechen")));
 	dialog.showModal();
@@ -142,20 +145,20 @@ $("help").addEventListener("close", () => (started ??= start().catch((err) => sa
 $("help").showModal();
 
 $("btn-help").addEventListener("click", () => $("help").showModal());
-$("btn-add").addEventListener("click", () =>
+$("btn-add").addEventListener("click", () => {
+	const defs = [...library.defs.values()];
+	const groups = [...new Set(defs.map((def) => def.group))];
+	const add = (def) =>
+		serial(async () => {
+			const inst = await rack.add(def.id);
+			view.render();
+			document.querySelector(`.module[data-id="${inst.id}"]`).scrollIntoView({ behavior: "smooth", block: "nearest" });
+		});
 	pick(
 		"Modul hinzufügen",
-		[...library.defs.values()].map((def) => ({
-			...def,
-			run: () =>
-				serial(async () => {
-					const inst = await rack.add(def.id);
-					view.render();
-					document.querySelector(`.module[data-id="${inst.id}"]`).scrollIntoView({ behavior: "smooth", block: "nearest" });
-				}),
-		})),
-	),
-);
+		defs.sort((a, b) => groups.indexOf(a.group) - groups.indexOf(b.group)).map((def) => ({ ...def, run: () => add(def) })),
+	);
+});
 $("btn-patches").addEventListener("click", async () => {
 	const examples = await fetchJson("patches/index.json");
 	pick("Patch laden", [

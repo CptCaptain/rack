@@ -1,0 +1,23 @@
+{
+  "name": "Euclid",
+  "group": "Spielen und Takt",
+  "color": "#f08a4b",
+  "columns": 2,
+  "description": "Rhythmus-Geber: verteilt eine Zahl Treffer gleichmäßig auf eine Zahl Schritte.",
+  "inputs": [
+    {
+      "name": "Clock",
+      "kind": "gate"
+    },
+    {
+      "name": "Reset",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Gate",
+      "kind": "gate"
+    }
+  ]
+}

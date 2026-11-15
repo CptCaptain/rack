@@ -1,0 +1,23 @@
+{
+  "name": "Chorus",
+  "group": "Effekte",
+  "color": "#3fa7a3",
+  "columns": 2,
+  "description": "Chorus: lässt einen Klang nach mehreren klingen und macht ihn breit. Stereo-Ausgang.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "audio"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "L",
+      "kind": "audio"
+    },
+    {
+      "name": "R",
+      "kind": "audio"
+    }
+  ]
+}

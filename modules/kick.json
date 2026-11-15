@@ -1,0 +1,19 @@
+{
+  "name": "Kick",
+  "group": "Schlagzeug",
+  "color": "#e05a4f",
+  "columns": 2,
+  "description": "Bassdrum: ein tiefer Schlag bei jedem Impuls am Eingang.",
+  "inputs": [
+    {
+      "name": "Trig",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

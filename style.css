@@ -79,3 +79,4 @@ dialog form { display: flex; align-items: center; justify-content: flex-end; gap
 @media (max-width: 600px) {
 	.module { min-height: 0; }
 }
+select { font: inherit; font-size: 11px; color: inherit; background: #111216; border: 1px solid var(--color, var(--line)); border-radius: 6px; min-height: 36px; padding: 2px 4px; max-width: 100%; }

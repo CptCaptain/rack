@@ -1,0 +1,19 @@
+{
+  "name": "Snare",
+  "group": "Schlagzeug",
+  "color": "#e8a04a",
+  "columns": 2,
+  "description": "Snare: ein kurzer Ton mit Rauschen bei jedem Impuls.",
+  "inputs": [
+    {
+      "name": "Trig",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

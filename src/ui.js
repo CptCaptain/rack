@@ -75,6 +75,17 @@ function toggle(c, io) {
 	return h("div", { class: "control" }, button);
 }
 
+function select(c, io) {
+	const options = c.options.map((option) => {
+		const el = h("option", { value: option.value }, option.label);
+		el.selected = option.value === io.value;
+		return el;
+	});
+	const el = h("select", { "aria-label": c.label }, ...options);
+	el.addEventListener("change", () => io.set(Number(el.value)));
+	return h("div", { class: "control wide" }, h("span", {}, c.label), el);
+}
+
 function button(c, io) {
 	const el = h("button", { class: "toggle" }, c.label);
 	el.addEventListener("pointerdown", () => io.poke(1));
@@ -94,7 +105,7 @@ function meter(c, io) {
 	return h("div", { class: "meter wide", title: c.label }, bar);
 }
 
-const CONTROLS = { knob, toggle, button, leds, meter };
+const CONTROLS = { knob, toggle, select, button, leds, meter };
 
 export class RackView {
 	constructor(rack, root) {

@@ -41,6 +41,8 @@ process(a, b) = a * (1 - mix) + a * b * mix;
 
 Trage danach `"ringmod"` in `modules/index.json` ein.
 
+`npm run modules` kompiliert alle Module in `modules/` ohne Browser und zeigt Fehler, Buchsen und Regleradressen. Prüfe ein neues Modul damit, bevor du es in `index.json` einträgst.
+
 ## Felder der JSON-Datei
 
 | Feld | Pflicht | Bedeutung |
@@ -48,6 +50,7 @@ Trage danach `"ringmod"` in `modules/index.json` ein.
 | `name` | ja | Titel auf dem Modul. |
 | `description` | nein | Ein bis zwei Sätze für Einsteiger. Erscheint im Menü und als Tooltip. |
 | `color` | nein | CSS-Farbe für den Streifen und die Regler. |
+| `group` | nein | Überschrift im Menü **+ Modul**. Module mit derselben Gruppe stehen zusammen. |
 | `inputs` | ja | Eine Buchse je Eingang von `process`, in derselben Reihenfolge. |
 | `outputs` | ja | Eine Buchse je Ausgang von `process`, in derselben Reihenfolge. |
 | `columns` | nein | Regler pro Zeile. Vorgabe ist 2. |
@@ -66,6 +69,7 @@ Das Rack baut die Bedienelemente aus den UI-Elementen des Faust-Programms.
 | --- | --- |
 | `hslider`, `vslider`, `nentry` | Drehregler |
 | Dasselbe mit genau zwei Werten, zum Beispiel `hslider("Lauf", 1, 0, 1, 1)` | Schalter |
+| `nentry` mit `[style:menu{'Dur':0;'Moll':1}]` | Auswahlliste |
 | `checkbox` | Schalter, startet immer aus |
 | `button` | Taster |
 | `hbargraph`, `vbargraph` | Pegelbalken |

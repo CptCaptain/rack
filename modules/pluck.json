@@ -1,0 +1,23 @@
+{
+  "name": "Pluck",
+  "group": "Klangquellen",
+  "color": "#c9a227",
+  "columns": 2,
+  "description": "Gezupfte Saite: jeder Impuls zupft einen Ton in der Tonhöhe des Pitch-Eingangs.",
+  "inputs": [
+    {
+      "name": "V/Oct",
+      "kind": "cv"
+    },
+    {
+      "name": "Trig",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

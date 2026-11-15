@@ -1,0 +1,19 @@
+{
+  "name": "Drive",
+  "group": "Effekte",
+  "color": "#d1495b",
+  "columns": 2,
+  "description": "Verzerrer: übersteuert den Klang wie ein zu laut gedrehter Verstärker.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "audio"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

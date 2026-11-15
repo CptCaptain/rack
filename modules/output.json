@@ -18,5 +18,6 @@
       "kind": "audio"
     }
   ],
-  "outputs": []
+  "outputs": [],
+  "group": "Ausgang"
 }

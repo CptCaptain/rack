@@ -1,0 +1,19 @@
+{
+  "name": "Scale",
+  "group": "Steuerung",
+  "color": "#8d99ae",
+  "columns": 2,
+  "description": "Macht ein Steuersignal größer, kleiner oder dreht es um, und verschiebt es.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "cv"
+    }
+  ]
+}

@@ -33,6 +33,11 @@ function parseControl(item) {
 		case "vslider":
 		case "nentry": {
 			const { min, max, step, init } = item;
+			const menu = /^(?:menu|radio)\{(.*)\}$/.exec(meta.style ?? "");
+			if (menu) {
+				const options = [...menu[1].matchAll(/'([^']*)'\s*:\s*(-?[\d.]+)/g)].map(([, label, value]) => ({ label, value: Number(value) }));
+				return { ...base, type: "select", init, options };
+			}
 			const type = max - min === step ? "toggle" : "knob";
 			return { ...base, type, min, max, step, init, log: meta.scale === "log" && min > 0 };
 		}
@@ -48,7 +53,7 @@ function parseControl(item) {
 	}
 }
 
-async function compile(compiler, id, info, code) {
+export async function compile(compiler, id, info, code) {
 	const generator = new FaustMonoDspGenerator();
 	if (!(await generator.compile(compiler, id, code, "-ftz 2")))
 		throw new Error(compiler.getErrorMessage() || "Faust-Kompilierung fehlgeschlagen");
@@ -59,6 +64,7 @@ async function compile(compiler, id, info, code) {
 		id,
 		name: String(info.name ?? id),
 		description: String(info.description ?? ""),
+		group: String(info.group ?? ""),
 		color: String(info.color ?? "#888"),
 		columns: Number(info.columns) || 2,
 		widget: info.widget ?? null,

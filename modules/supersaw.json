@@ -1,0 +1,23 @@
+{
+  "name": "Supersaw",
+  "group": "Klangquellen",
+  "color": "#f2c14e",
+  "columns": 2,
+  "description": "Sieben leicht verstimmte Sägezähne auf einmal. Breit und fett, in Stereo.",
+  "inputs": [
+    {
+      "name": "V/Oct",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "L",
+      "kind": "audio"
+    },
+    {
+      "name": "R",
+      "kind": "audio"
+    }
+  ]
+}

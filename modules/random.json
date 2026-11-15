@@ -1,0 +1,27 @@
+{
+  "name": "Random",
+  "group": "Steuerung",
+  "color": "#5fb49c",
+  "columns": 2,
+  "description": "Zufall: würfelt bei jedem Clock-Impuls einen neuen Wert. Für Melodien, die sich selbst erfinden.",
+  "inputs": [
+    {
+      "name": "Clock",
+      "kind": "gate"
+    },
+    {
+      "name": "In",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Stufen",
+      "kind": "cv"
+    },
+    {
+      "name": "Weich",
+      "kind": "cv"
+    }
+  ]
+}

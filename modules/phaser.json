@@ -1,0 +1,19 @@
+{
+  "name": "Phaser",
+  "group": "Effekte",
+  "color": "#5c7cfa",
+  "columns": 2,
+  "description": "Phaser: ein wandernder, hohler Schimmer über dem Klang.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "audio"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "Hi-Hat",
+  "group": "Schlagzeug",
+  "color": "#e6d36a",
+  "columns": 2,
+  "description": "Hi-Hat: ein kurzes helles Zischen. Mit längerem Decay klingt sie offen.",
+  "inputs": [
+    {
+      "name": "Trig",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "audio"
+    }
+  ]
+}

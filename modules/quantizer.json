@@ -1,0 +1,19 @@
+{
+  "name": "Quantizer",
+  "group": "Steuerung",
+  "color": "#4ea8de",
+  "columns": 2,
+  "description": "Zwingt eine beliebige Tonhöhe auf die Töne einer Tonleiter. Macht aus Zufall Musik.",
+  "inputs": [
+    {
+      "name": "In",
+      "kind": "cv"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Out",
+      "kind": "cv"
+    }
+  ]
+}

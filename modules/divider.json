@@ -1,0 +1,35 @@
+{
+  "name": "Divider",
+  "group": "Spielen und Takt",
+  "color": "#d96c5f",
+  "columns": 1,
+  "description": "Taktteiler: lässt nur jeden 2., 3., 4. oder 8. Impuls durch.",
+  "inputs": [
+    {
+      "name": "Clock",
+      "kind": "gate"
+    },
+    {
+      "name": "Reset",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "/2",
+      "kind": "gate"
+    },
+    {
+      "name": "/3",
+      "kind": "gate"
+    },
+    {
+      "name": "/4",
+      "kind": "gate"
+    },
+    {
+      "name": "/8",
+      "kind": "gate"
+    }
+  ]
+}

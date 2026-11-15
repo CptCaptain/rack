@@ -18,5 +18,20 @@
 		"file": "wind.json",
 		"name": "Wind",
 		"description": "Rauschen durch ein Filter, das zwei LFOs bewegen. Ganz ohne Oszillator."
+	},
+	{
+		"file": "drums.json",
+		"name": "Drum-Maschine",
+		"description": "Kick, Snare und Hi-Hat. Dreh an Treffer und Dreh im Euclid und der Rhythmus ändert sich."
+	},
+	{
+		"file": "zufall.json",
+		"name": "Zufallsmelodie",
+		"description": "Der Zufall würfelt Töne, der Quantizer zwingt sie in eine Tonleiter, eine Saite zupft sie."
+	},
+	{
+		"file": "supersaw.json",
+		"name": "Supersaw-Fläche",
+		"description": "Breite Flächen zum Spielen: Supersaw, Filter, Chorus. Tasten A bis L."
 	}
 ]
