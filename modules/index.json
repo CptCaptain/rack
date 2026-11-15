@@ -27,5 +27,7 @@
   "phaser",
   "drive",
   "crusher",
+  "midiout",
+  "audioin",
   "output"
 ]

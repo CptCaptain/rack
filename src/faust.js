@@ -63,7 +63,9 @@ export async function compile(compiler, id, info, code) {
 		throw new Error(compiler.getErrorMessage() || "Faust-Kompilierung fehlgeschlagen");
 	const dsp = JSON.parse(generator.factory.json);
 	const speakers = info.speakers === true;
+	const microphone = info.microphone === true;
 	if (speakers && dsp.outputs !== 2) throw new Error(`${id}.dsp braucht für "speakers" genau 2 Ausgänge`);
+	if (microphone && dsp.inputs !== 2) throw new Error(`${id}.dsp braucht für "microphone" genau 2 Eingänge`);
 	return {
 		id,
 		name: String(info.name ?? id),
@@ -73,7 +75,8 @@ export async function compile(compiler, id, info, code) {
 		columns: Number(info.columns) || 2,
 		widget: info.widget ?? null,
 		speakers,
-		inputs: parsePorts(id, info.inputs, dsp.inputs, "Eingänge"),
+		microphone,
+		inputs: parsePorts(id, microphone ? [] : info.inputs, microphone ? 0 : dsp.inputs, "Eingänge"),
 		outputs: parsePorts(id, speakers ? [] : info.outputs, speakers ? 0 : dsp.outputs, "Ausgänge"),
 		controls: flatten(dsp.ui).map(parseControl),
 		generator,

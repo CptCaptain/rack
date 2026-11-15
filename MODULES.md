@@ -55,7 +55,8 @@ Trage danach `"ringmod"` in `modules/index.json` ein.
 | `outputs` | ja | Eine Buchse je Ausgang von `process`, in derselben Reihenfolge. |
 | `columns` | nein | Regler pro Zeile. Vorgabe ist 2. |
 | `speakers` | nein | `true` schickt die zwei Ausgänge des Moduls an die Lautsprecher. `outputs` entfällt dann. |
-| `widget` | nein | Zusätzliches Bedienfeld. Es gibt nur `"keyboard"`. |
+| `microphone` | nein | `true` speist die zwei Eingänge des Moduls aus dem Audio-Eingang des Rechners. `inputs` entfällt dann. |
+| `widget` | nein | Zusätzliches Bedienfeld: `"keyboard"`, `"pads"` oder `"midiout"`. |
 
 Eine Buchse hat `name` und `kind`. `kind` ist `audio`, `cv` oder `gate` und bestimmt nur die Farbe. Jede Buchse lässt sich mit jeder verbinden.
 
@@ -101,7 +102,19 @@ Mehrere Kabel in einem Eingang addieren sich. Ein offener Eingang liefert 0, als
 - Begrenze Frequenzen und Verzögerungen mit `min` und `max`. Ein CV-Eingang kann jeden Wert liefern.
 - Halte ein Modul klein. Zwei bis vier Regler reichen meistens.
 - Ein Kabel, das einen Kreis schließt, verzögert das Rack um 128 Samples. Rückkopplung innerhalb eines Moduls ist samplegenau.
-- Das Widget `keyboard` erwartet zwei versteckte Regler mit den Labels `gate` und `note` (MIDI-Nummer). `modules/keyboard.dsp` zeigt es.
+- Ein Regler, den kein Signal benutzt, verschwindet beim Kompilieren. `modules/midiout.dsp` zeigt, wie `attach` ihn behält.
+
+## Widgets
+
+Ein Widget ist JavaScript in `src/` und verbindet versteckte Regler eines Moduls mit der Außenwelt. Es findet die Regler über ihr Label.
+
+| Widget | Erwartet im Faust-Programm | Tut |
+| --- | --- | --- |
+| `keyboard` | versteckte Regler `gate`, `note` (MIDI-Nummer), `vel`, `bend`, `mod` | Klaviatur, Computertasten und MIDI-Noten |
+| `pads` | versteckte Taster `pad1` bis `pad8` | acht Schlagflächen, Tasten 1 bis 8, MIDI-Noten auf Kanal 10 |
+| `midiout` | versteckte Bargraphs `note` und `gate`, Regler `Kanal` | schickt MIDI-Noten an alle MIDI-Ausgänge |
+
+Ein neues Widget braucht eine Datei in `src/`, einen Eintrag in `WIDGETS` in `src/ui.js` und einen Build.
 
 ## Patchformat
 
@@ -117,5 +130,7 @@ Ein Patch ist eine JSON-Datei. Beispiele liegen in `patches/`, `patches/index.js
 	"cables": [{ "from": ["vco1", 1], "to": ["output1", 0] }]
 }
 ```
+
+Optional kommt `"midi": [{ "cc": 74, "module": "vcf1", "address": "/vcf/Cutoff" }]` dazu. Jeder Eintrag bindet einen MIDI-Controller an einen Regler.
 
 `type` ist die Modul-ID. `params` nennt nur Regler, die von der Vorgabe abweichen. Der Schlüssel ist die Faust-Adresse `/<id>/<Label>`, Leerzeichen im Label werden zu `_`. Ein Kabel führt von `[Modul, Ausgang]` zu `[Modul, Eingang]`, gezählt ab 0.

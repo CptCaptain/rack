@@ -1,8 +1,10 @@
 import { clamp, travel } from "./controls.js";
 import { keyboard } from "./keyboard.js";
+import { midiout } from "./midiout.js";
 import { pads } from "./pads.js";
 
-const WIDGETS = { keyboard, pads };
+// A widget gets the module definition and { id, poke, value, onOutput }, all keyed by control label.
+const WIDGETS = { keyboard, pads, midiout };
 const SVG = "http://www.w3.org/2000/svg";
 
 export function h(tag, attrs = {}, ...children) {
@@ -193,7 +195,13 @@ export class RackView {
 				if (cc !== undefined) el.dataset.cc = cc;
 				return el;
 			});
-		const widget = WIDGETS[def.widget]?.(def, (address, value) => this.rack.poke(id, address, value));
+		const address = (label) => def.controls.find((c) => c.label === label)?.address;
+		const widget = WIDGETS[def.widget]?.(def, {
+			id,
+			poke: (label, value) => this.rack.poke(id, address(label), value),
+			value: (label) => this.rack.modules.get(id).params[address(label)] ?? def.controls.find((c) => c.label === label).init,
+			onOutput: (label, fn) => this.outputs.set(`${id} ${address(label)}`, fn),
+		});
 		const jack = (dir) => (port, index) =>
 			h("div", { class: `jack ${port.kind}`, "data-module": id, "data-dir": dir, "data-port": index }, h("i"), h("span", {}, port.name));
 		return h(

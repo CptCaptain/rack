@@ -28,11 +28,14 @@ export function parsePatch(data, defs) {
 }
 
 export class Rack {
-	constructor(ctx, defs, { onChange = () => {}, onOutput = () => {} } = {}) {
+	#external;
+
+	constructor(ctx, defs, { onChange = () => {}, onOutput = () => {}, onRemove = () => {} } = {}) {
 		this.ctx = ctx;
 		this.defs = defs;
 		this.onChange = onChange;
 		this.onOutput = onOutput;
+		this.onRemove = onRemove;
 		this.modules = new Map();
 		this.cables = [];
 		// MIDI controller number -> the one control it moves.
@@ -43,20 +46,49 @@ export class Rack {
 		// input gets a running source, connected or not.
 		this.silence = new ConstantSourceNode(ctx, { offset: 0 });
 		this.silence.start();
+		// Chromium only runs a worklet that leads to the destination. This muted path keeps
+		// every module running, so a MIDI Out or a sequencer works without a cable to Output.
+		this.sink = new GainNode(ctx, { gain: 0 });
+		this.sink.connect(ctx.destination);
 	}
 
-	#wire(def, id, node) {
-		const inst = { id, def, node, params: {}, merger: null, splitter: null };
-		if (def.inputs.length) {
-			inst.merger = new ChannelMergerNode(this.ctx, { numberOfInputs: def.inputs.length });
-			def.inputs.forEach((_, port) => this.silence.connect(inst.merger, 0, port));
+	// The audio input of the computer as two channels. The browser asks for permission on first use.
+	#openExternal() {
+		this.#external ??= navigator.mediaDevices
+			.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
+			.then((mediaStream) => {
+				const stereo = new GainNode(this.ctx, { channelCount: 2, channelCountMode: "explicit" });
+				new MediaStreamAudioSourceNode(this.ctx, { mediaStream }).connect(stereo);
+				return stereo.connect(new ChannelSplitterNode(this.ctx, { numberOfOutputs: 2 }));
+			})
+			.catch((err) => {
+				this.#external = undefined;
+				throw new Error(`Kein Zugriff auf den Audio-Eingang: ${err.message}`);
+			});
+		return this.#external;
+	}
+
+	async #node(def) {
+		const external = def.microphone ? await this.#openExternal() : null;
+		return [await def.generator.createNode(this.ctx, def.id), external];
+	}
+
+	#wire(def, id, [node, external]) {
+		const inst = { id, def, node, external, params: {}, merger: null, splitter: null };
+		const inputs = external ? 2 : def.inputs.length;
+		if (inputs) {
+			inst.merger = new ChannelMergerNode(this.ctx, { numberOfInputs: inputs });
+			for (let port = 0; port < inputs; port++) {
+				this.silence.connect(inst.merger, 0, port);
+				external?.connect(inst.merger, port, port);
+			}
 			inst.merger.connect(node);
 		}
 		if (def.outputs.length) {
 			inst.splitter = new ChannelSplitterNode(this.ctx, { numberOfOutputs: def.outputs.length });
 			node.connect(inst.splitter);
 		}
-		if (def.speakers) node.connect(this.analyser);
+		node.connect(def.speakers ? this.analyser : this.sink);
 		node.setOutputParamHandler((address, value) => this.onOutput(id, address, value));
 		return inst;
 	}
@@ -66,6 +98,7 @@ export class Rack {
 		inst.splitter?.disconnect();
 		if (inst.merger) {
 			this.silence.disconnect(inst.merger);
+			inst.external?.disconnect(inst.merger);
 			inst.merger.disconnect();
 		}
 		inst.node.destroy();
@@ -74,7 +107,7 @@ export class Rack {
 	async add(type, { id, params = {} } = {}) {
 		const def = this.defs.get(type);
 		if (!def) throw new Error(`Unbekanntes Modul „${type}“`);
-		const node = await def.generator.createNode(this.ctx, def.id);
+		const node = await this.#node(def);
 		if (id === undefined) for (let n = 1; this.modules.has((id = `${type}${n}`)); n++);
 		if (this.modules.has(id)) throw new Error(`Modul-ID „${id}“ gibt es schon`);
 		this.modules.set(id, this.#wire(def, id, node));
@@ -90,6 +123,7 @@ export class Rack {
 		this.unlearn(id);
 		this.#unwire(inst);
 		this.modules.delete(id);
+		this.onRemove(id);
 		this.onChange();
 	}
 
@@ -97,9 +131,9 @@ export class Rack {
 	// cables survive where the new version still has that knob or jack.
 	async update(def) {
 		for (const old of [...this.modules.values()].filter((inst) => inst.def.id === def.id)) {
-			const node = await def.generator.createNode(this.ctx, def.id);
+			const node = await this.#node(def);
 			if (this.modules.get(old.id) !== old) {
-				node.destroy();
+				node[0].destroy();
 				continue;
 			}
 			const cables = this.#cablesOf(old.id);

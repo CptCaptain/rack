@@ -26,11 +26,8 @@ addEventListener("keydown", (e) => typed(e, 0.8));
 addEventListener("keyup", (e) => typed(e, 0));
 
 // Module widget "keyboard": drives the hidden controls gate, note, vel, bend and mod.
-export function keyboard(def, poke) {
-	const set = (label, value) => {
-		const control = def.controls.find((c) => c.label === label);
-		if (control) poke(control.address, value);
-	};
+export function keyboard(def, io) {
+	const set = io.poke;
 	const el = document.createElement("div");
 	el.className = "keys";
 	const keyEls = new Map();

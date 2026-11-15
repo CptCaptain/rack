@@ -30,7 +30,19 @@ COOP- und COEP-Header braucht die Seite nicht, weil sie keinen `SharedArrayBuffe
 npm run check     # oder: node scripts/check.mjs dist bild.png
 ```
 
-Das Skript lädt `dist/` in Chromium ohne Fenster. Es schlägt fehl, wenn ein Modul nicht kompiliert, ein Beispielpatch kein Signal am Ausgang liefert oder die Konsole einen Fehler zeigt. Es zieht auch ein Kabel und einen Regler mit der Maus und tauscht ein Modul im Betrieb.
+`npm run modules` kompiliert alle Module ohne Browser. `node scripts/probe.mjs` rendert kleine Testpatches und prüft Zahlen wie Trefferzahl, Tonleiter und Stimmung.
+
+`npm run check` lädt `dist/` in Chromium ohne Fenster. Es schlägt fehl, wenn ein Modul nicht kompiliert, ein Beispielpatch kein Signal am Ausgang liefert oder die Konsole einen Fehler zeigt. Es zieht auch ein Kabel und einen Regler mit der Maus, tauscht ein Modul im Betrieb und spielt über ein simuliertes MIDI-Gerät und ein simuliertes Mikrofon.
+
+## Echte Geräte
+
+Web MIDI und der Audio-Eingang brauchen Chrome oder Edge und HTTPS oder `localhost`. Der Knopf **MIDI** fragt einmal um Erlaubnis.
+
+- Noten spielen jedes Keyboard-Modul. Noten auf Kanal 10 schlagen die Pads im Pads-Modul an, Note 36 ist Pad 1.
+- Pitch-Bend und Modulationsrad kommen am Keyboard-Modul an.
+- **Lernen** bindet einen Regler am Gerät an einen Regler im Rack. Der Patch speichert die Bindung.
+- Das Modul MIDI Out schickt Pitch und Gate als Noten an alle MIDI-Ausgänge.
+- Das Modul Audio In holt den Audio-Eingang des Rechners ins Rack.
 
 ## Aufbau
 
@@ -41,6 +53,8 @@ Das Skript lädt `dist/` in Chromium ohne Fenster. Es schlägt fehl, wenn ein Mo
 | `src/faust.js` | Lädt und kompiliert Module, erkennt Änderungen. |
 | `src/rack.js` | Audio-Graph und Patch-Zustand, ohne DOM. |
 | `src/ui.js` | Module, Regler und Kabel im DOM. |
-| `src/keyboard.js` | Bildschirm- und Computertastatur. |
+| `src/controls.js` | Rechnet Reglerstellung in Werte um, auch für MIDI. |
+| `src/keyboard.js`, `src/pads.js` | Klaviatur und Schlagflächen: Bildschirm, Computertasten, MIDI. |
+| `src/midi.js`, `src/midiout.js` | Web MIDI: Eingänge lesen, Noten senden. |
 | `src/main.js` | Start, Menüs, Speichern, Abgleich mit `modules/`. |
-| `scripts/` | `vendor`, `build`, `serve`, `check`. |
+| `scripts/` | `vendor`, `build`, `serve`, `check`, `modules`, `probe`. |

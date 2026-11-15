@@ -1,0 +1,18 @@
+{
+  "name": "Audio In",
+  "group": "Echte Geräte",
+  "color": "#ff9f1c",
+  "microphone": true,
+  "columns": 1,
+  "description": "Holt Klang von außen ins Rack: Mikrofon, Line-Eingang oder ein Gerät mit USB-Audio. Mit Kopfhörern benutzen, sonst pfeift es.",
+  "outputs": [
+    {
+      "name": "L",
+      "kind": "audio"
+    },
+    {
+      "name": "R",
+      "kind": "audio"
+    }
+  ]
+}

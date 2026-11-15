@@ -17,7 +17,8 @@ const server = await serve(dir);
 const url = `http://localhost:${server.address().port}/`;
 const browser = await chromium.launch({
 	executablePath: process.env.CHROMIUM ?? "/usr/bin/chromium",
-	args: ["--autoplay-policy=no-user-gesture-required"],
+	// The fake media device is a beeping microphone, for the Audio In module.
+	args: ["--autoplay-policy=no-user-gesture-required", "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"],
 });
 const page = await browser.newPage({ viewport: { width: 1500, height: 900 } });
 const consoleProblems = [];
@@ -27,7 +28,9 @@ page.on("pageerror", (err) => consoleProblems.push(`pageerror: ${err.message}`))
 await page.addInitScript(() => {
 	const input = { name: "Test Keys", onmidimessage: null };
 	window.fakeMidi = (...bytes) => input.onmidimessage?.({ data: new Uint8Array(bytes) });
-	Object.defineProperty(navigator, "requestMIDIAccess", { value: async () => ({ inputs: new Map([["in", input]]), outputs: new Map(), onstatechange: null }) });
+	window.midiSent = [];
+	const output = { name: "Test Synth", send: (bytes) => window.midiSent.push([...bytes].join(" ")) };
+	Object.defineProperty(navigator, "requestMIDIAccess", { value: async () => ({ inputs: new Map([["in", input]]), outputs: new Map([["out", output]]), onstatechange: null }) });
 });
 
 const peak = () =>
@@ -148,6 +151,38 @@ try {
 	const hit = await peak();
 	await page.evaluate(() => window.fakeMidi(0x89, 36, 0));
 	check(hit > 0.05, `a MIDI pad note on channel 10 triggers the kick, peak ${hit.toFixed(3)}`);
+
+	// Clock at 240 BPM, sequencer steps 0, 4 and 7 semitones, MIDI Out on channel 2: expect C4, E4, G4 in that order.
+	await page.evaluate((patch) => window.faustRack.openPatch(patch), {
+		format: "faust-rack/1",
+		modules: [
+			{ id: "clock1", type: "clock", params: { "/clock/Tempo": 240 } },
+			{ id: "seq1", type: "seq", params: { "/seq/Stufen": 3, "/seq/2": 4, "/seq/3": 7 } },
+			{ id: "midiout1", type: "midiout", params: { "/midiout/Kanal": 2 } },
+		],
+		cables: [{ from: ["clock1", 0], to: ["seq1", 0] }, { from: ["seq1", 0], to: ["midiout1", 0] }, { from: ["seq1", 1], to: ["midiout1", 1] }],
+	});
+	await page.evaluate(() => (window.midiSent.length = 0));
+	await page.waitForTimeout(2100);
+	const sent = await page.evaluate(() => window.midiSent);
+	const ons = sent.filter((m) => m.startsWith("145 ")).map((m) => Number(m.split(" ")[1]));
+	const offs = sent.filter((m) => m.startsWith("129 "));
+	const cycle = [60, 64, 67];
+	const inOrder = ons.every((note, i) => cycle.includes(note) && (i === 0 || note === cycle[(cycle.indexOf(ons[i - 1]) + 1) % 3]));
+	check(ons.length >= 7 && ons.length <= 9 && inOrder && Math.abs(ons.length - offs.length) <= 1, `MIDI Out sends the sequence in order on channel 2, notes ${ons.join(" ")}`);
+	await page.evaluate(() => (window.midiSent.length = 0));
+	await page.click('.module[data-id="midiout1"] .close');
+	const after = await page.evaluate(() => window.midiSent);
+	check(after.filter((m) => m.startsWith("145 ")).length === 0, `removing MIDI Out sends no further notes and releases a held one: ${after.join(", ") || "nothing held"}`);
+
+	await page.evaluate((patch) => window.faustRack.openPatch(patch), {
+		format: "faust-rack/1",
+		modules: [{ id: "audioin1", type: "audioin", params: {} }, { id: "output1", type: "output", params: {} }],
+		cables: [{ from: ["audioin1", 0], to: ["output1", 1] }, { from: ["audioin1", 1], to: ["output1", 2] }],
+	});
+	await page.waitForTimeout(500);
+	const heard = await peak();
+	check(heard > 0.005, `Audio In passes the (fake) microphone to the output, peak ${heard.toFixed(3)}`);
 	await page.evaluate((patch) => window.faustRack.openPatch(patch), first);
 
 	// Live update: a new module appears, then its changed source replaces the running instance.

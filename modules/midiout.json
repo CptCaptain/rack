@@ -1,0 +1,24 @@
+{
+  "name": "MIDI Out",
+  "group": "Echte Geräte",
+  "color": "#2ec4b6",
+  "widget": "midiout",
+  "columns": 1,
+  "description": "Spielt ein echtes Gerät: macht aus Pitch und Gate MIDI-Noten und schickt sie an alle angeschlossenen MIDI-Ausgänge.",
+  "inputs": [
+    {
+      "name": "Pitch",
+      "kind": "cv"
+    },
+    {
+      "name": "Gate",
+      "kind": "gate"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Thru",
+      "kind": "gate"
+    }
+  ]
+}

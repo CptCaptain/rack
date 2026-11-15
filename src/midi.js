@@ -14,16 +14,23 @@ export function parseMidi([status, a = 0, b = 0]) {
 	}
 }
 
+let access;
+
+export function sendMidi(bytes) {
+	for (const output of access?.outputs.values() ?? []) output.send(bytes);
+}
+
 // Listens on every MIDI input, also on devices plugged in later.
 export async function openMidi(onEvent, onDevices) {
-	const access = await navigator.requestMIDIAccess();
+	access = await navigator.requestMIDIAccess();
 	const attach = () => {
 		for (const input of access.inputs.values())
 			input.onmidimessage = (e) => {
 				const event = parseMidi(e.data);
 				if (event) onEvent(event);
 			};
-		onDevices([...access.inputs.values()].map((input) => input.name));
+		const names = (ports) => [...ports.values()].map((port) => port.name);
+		onDevices(names(access.inputs), names(access.outputs));
 	};
 	access.onstatechange = attach;
 	attach();

@@ -18,7 +18,7 @@ addEventListener("keydown", (e) => typed(e, 1));
 addEventListener("keyup", (e) => typed(e, 0));
 
 // Module widget "pads": drives the hidden buttons pad1 to pad8.
-export function pads(def, poke) {
+export function pads(def, io) {
 	const el = document.createElement("div");
 	el.className = "pads";
 	const buttons = Array.from({ length: COUNT }, (_, index) => {
@@ -32,7 +32,7 @@ export function pads(def, poke) {
 	const set = {
 		el,
 		press(index, down) {
-			poke(def.controls.find((c) => c.label === `pad${index + 1}`).address, down ? 1 : 0);
+			io.poke(`pad${index + 1}`, down ? 1 : 0);
 			buttons[index].classList.toggle("on", down);
 		},
 	};

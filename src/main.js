@@ -2,6 +2,7 @@ import { valueFromMidi } from "./controls.js";
 import { ModuleLibrary } from "./faust.js";
 import { keys } from "./keyboard.js";
 import { openMidi } from "./midi.js";
+import { releaseMidiOut } from "./midiout.js";
 import { hitPad } from "./pads.js";
 import { Rack } from "./rack.js";
 import { RackView, h } from "./ui.js";
@@ -106,8 +107,9 @@ function onMidi(event) {
 async function connectMidi() {
 	if (!navigator.requestMIDIAccess) return say("Dieser Browser kann kein Web MIDI. Chrome und Edge können es.", true);
 	try {
-		await openMidi(onMidi, (inputs) => {
-			say(inputs.length ? `MIDI verbunden: ${inputs.join(", ")}` : "MIDI ist an, aber es ist kein Gerät angeschlossen.");
+		await openMidi(onMidi, (inputs, outputs) => {
+			const list = (names) => names.join(", ") || "nichts";
+			say(`MIDI an. Eingänge: ${list(inputs)}. Ausgänge: ${list(outputs)}.`);
 			$("btn-midi").setAttribute("aria-pressed", "true");
 			$("btn-learn").disabled = false;
 		});
@@ -154,6 +156,7 @@ async function start() {
 	const save = () => localStorage.setItem(STORE, JSON.stringify(rack));
 	let saveTimer;
 	rack = new Rack(ctx, library.defs, {
+		onRemove: releaseMidiOut,
 		onChange: () => {
 			clearTimeout(saveTimer);
 			saveTimer = setTimeout(save, 300);
