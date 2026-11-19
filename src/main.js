@@ -5,7 +5,8 @@ import { explain } from "./explain.js";
 import { ModuleLibrary } from "./faust.js";
 import { keys } from "./keyboard.js";
 import { forgetWorld } from "./life.js";
-import { openMidi } from "./midi.js";
+import { BleMidi } from "./blemidi.js";
+import { openMidi, parseMidi } from "./midi.js";
 import { releaseMidiOut } from "./midiout.js";
 import { hitPad } from "./pads.js";
 import { Rack } from "./rack.js";
@@ -256,6 +257,51 @@ async function connectMidi() {
 	}
 }
 
+// Bluetooth MIDI feeds the same path as Web MIDI. Notes it holds are let go when the link drops.
+const bleHeld = new Set();
+const BLE_LABEL = { connecting: () => "Verbinde …", connected: (name) => `BT: ${name}`, reconnecting: () => "BT getrennt, verbinde neu …", off: () => "Bluetooth-MIDI verbinden" };
+const ble = new BleMidi(
+	(message) => {
+		const event = parseMidi(message);
+		if (!event) return;
+		if (event.type === "note" && event.channel !== 10) event.velocity > 0 ? bleHeld.add(event.note) : bleHeld.delete(event.note);
+		onMidi(event);
+	},
+	(state, name) => {
+		const button = $("btn-ble");
+		button.textContent = BLE_LABEL[state](name);
+		button.setAttribute("aria-pressed", String(state === "connected"));
+		$("btn-ble-off").hidden = state === "off";
+		if (state !== "connected") {
+			for (const note of bleHeld) keys.play(note, 0);
+			bleHeld.clear();
+			keys.bend(0);
+		}
+		if (state === "connected") {
+			$("btn-learn").disabled = false;
+			say(`Bluetooth-MIDI verbunden: ${name}. Die Tasten spielen das Keyboard-Modul.`);
+		}
+		if (state === "reconnecting") say(`Bluetooth-Verbindung zu ${name} verloren. Ich verbinde neu, sobald es wieder da ist.`, true);
+	},
+);
+
+async function connectBle() {
+	if (!BleMidi.available)
+		return say("Bluetooth-MIDI braucht Web Bluetooth: Chrome auf Android oder Chrome/Edge am Rechner. iPhone, Safari und Firefox können das nicht.", true);
+	try {
+		await ble.connect();
+	} catch (err) {
+		if (err.name === "NotFoundError")
+			return say("Kein Gerät gewählt. Fehlt der FM1 in der Liste: einschalten, in den Bluetooth-Einstellungen von Android entkoppeln und Chrome „Geräte in der Nähe“ bzw. Standort erlauben.", true);
+		say(`Bluetooth-MIDI ging nicht: ${err.message}`, true);
+	}
+}
+
+function disconnectBle() {
+	ble.disconnect();
+	say("Bluetooth-MIDI getrennt.");
+}
+
 function drawScope() {
 	const canvas = $("scope");
 	const g = canvas.getContext("2d");
@@ -492,6 +538,9 @@ addEventListener("keydown", (e) => {
 	e.shiftKey ? redo() : undo();
 });
 $("btn-midi").addEventListener("click", connectMidi);
+$("btn-ble").addEventListener("click", connectBle);
+$("btn-ble-off").addEventListener("click", disconnectBle);
+if (!BleMidi.available) $("btn-ble").title = "Braucht Chrome auf Android oder Chrome/Edge am Rechner";
 $("btn-learn").addEventListener("click", () => {
 	const on = $("btn-learn").getAttribute("aria-pressed") !== "true";
 	$("btn-learn").setAttribute("aria-pressed", String(on));

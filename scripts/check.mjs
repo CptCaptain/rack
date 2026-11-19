@@ -31,6 +31,28 @@ await page.addInitScript(() => {
 	window.midiSent = [];
 	const output = { name: "Test Synth", send: (bytes) => window.midiSent.push([...bytes].join(" ")) };
 	Object.defineProperty(navigator, "requestMIDIAccess", { value: async () => ({ inputs: new Map([["in", input]]), outputs: new Map([["out", output]]), onstatechange: null }) });
+	// No Bluetooth either: a fake BLE-MIDI device. fakeBle(...) sends one BLE-MIDI packet, fakeBleDrop() cuts the link.
+	let notify = null;
+	const characteristic = { addEventListener: (_, f) => (notify = f), removeEventListener: () => {}, startNotifications: async () => {} };
+	const lost = [];
+	const device = {
+		name: "FM1 Test",
+		addEventListener: (_, f) => lost.push(f),
+		gatt: {
+			connected: false,
+			async connect() {
+				this.connected = true;
+				return { getPrimaryService: async () => ({ getCharacteristic: async () => characteristic }) };
+			},
+			disconnect() {
+				this.connected = false;
+				for (const f of lost) f();
+			},
+		},
+	};
+	window.fakeBle = (...bytes) => notify?.({ target: { value: new DataView(new Uint8Array(bytes).buffer) } });
+	window.fakeBleDrop = () => device.gatt.disconnect();
+	Object.defineProperty(navigator, "bluetooth", { value: { requestDevice: async () => device } });
 });
 
 const peak = () =>
@@ -662,6 +684,23 @@ try {
 	check((await peak()) > 0.005 && (await page.locator('.keys i[data-note="64"].on').count()) === 1, "a MIDI note plays the Keyboard module");
 	await page.evaluate(() => window.fakeMidi(0x80, 64, 0));
 	check((await page.locator(".keys i.on").count()) === 0, "note off releases the key");
+
+	await page.click("#btn-ble");
+	await page.waitForTimeout(200);
+	const bleSizes = await page.evaluate(() => ["btn-ble", "btn-ble-off"].map((id) => document.getElementById(id).getBoundingClientRect().height));
+	check((await page.textContent("#btn-ble")) === "BT: FM1 Test" && (await page.isVisible("#btn-ble-off")) && bleSizes.every((h) => h >= 40), `the Bluetooth button connects and names the device, buttons ${bleSizes.join(" and ")} px high`);
+	await page.evaluate(() => window.fakeBle(0x80, 0x80, 0x90, 67, 100));
+	await page.waitForTimeout(400);
+	check((await peak()) > 0.005 && (await page.locator('.keys i[data-note="67"].on').count()) === 1, "a Bluetooth MIDI note plays the Keyboard module");
+	await page.evaluate(() => window.fakeBleDrop());
+	const lostLink = { label: await page.textContent("#btn-ble"), held: await page.locator(".keys i.on").count() };
+	await page.waitForTimeout(1500);
+	const back = await page.textContent("#btn-ble");
+	await page.evaluate(() => window.fakeBle(0x80, 0x80, 0x90, 60, 100, 0x81, 62, 100, 60, 0));
+	const runningStatus = await page.evaluate(() => [...document.querySelectorAll(".keys i.on")].map((key) => key.dataset.note).join(" "));
+	check(/verbinde neu/.test(lostLink.label) && lostLink.held === 0 && back === "BT: FM1 Test" && runningStatus === "62", `a dropped link lets go of the key and reconnects ("${lostLink.label}", then "${back}"), running status plays key ${runningStatus}`);
+	await page.click("#btn-ble-off");
+	check((await page.textContent("#btn-ble")) === "Bluetooth-MIDI verbinden" && !(await page.isVisible("#btn-ble-off")) && (await page.locator(".keys i.on").count()) === 0, "Trennen disconnects and lets go of the held key");
 	await page.click("#btn-learn");
 	await page.click('.module[data-id="vcf1"] .control[data-address="/vcf/Cutoff"] .dial');
 	await page.evaluate(() => window.fakeMidi(0xb0, 74, 127));

@@ -19,6 +19,8 @@
 	<button id="btn-record" aria-pressed="false" title="Nimmt auf, was das Rack spielt, und lädt es als WAV-Datei herunter">Aufnahme</button>
 	<button id="btn-power" aria-pressed="true">Ton</button>
 	<button id="btn-midi" aria-pressed="false">MIDI</button>
+	<button id="btn-ble" aria-pressed="false" title="Verbindet ein MIDI-Gerät über Bluetooth, zum Beispiel ein Keyboard">Bluetooth-MIDI verbinden</button>
+	<button id="btn-ble-off" hidden>Trennen</button>
 	<button id="btn-learn" aria-pressed="false" disabled>Lernen</button>
 	<button id="btn-play" aria-pressed="false" title="Zeigt nur die gewählten Regler, groß, dazu Tasten, Pads und Raster">Spielen</button>
 	<button id="btn-pin" hidden>Regler wählen</button>
@@ -83,6 +85,7 @@
 		<li><b>Regler modulieren:</b> ein Kabel von einem Ausgang auf einen Regler ziehen, zum Beispiel vom LFO. Oder den Ausgang antippen und dann den Regler. Der Regler bewegt sich dann von selbst, ein Punkt zeigt wohin. Das Kabel antippen stellt die Stärke ein.</li>
 		<li><b>Spielen:</b> Im Keyboard-Modul klicken oder die Tasten A bis L drücken, W E T Z U O sind die schwarzen Tasten.</li>
 		<li><b>MIDI-Geräte:</b> „MIDI“ drücken und im Browser erlauben. Die Tasten spielen das Keyboard-Modul, Pads auf Kanal 10 das Pads-Modul. Für Drehregler „Lernen“ einschalten, einen Regler im Rack antippen und den Regler am Gerät bewegen. Das Modul „MIDI Out“ spielt ein angeschlossenes Gerät, „Audio In“ holt dessen Klang ins Rack.</li>
+		<li><b>Bluetooth-MIDI:</b> „Bluetooth-MIDI verbinden“ drücken und das Gerät in der Liste wählen. Seine Tasten spielen dann wie oben das Keyboard-Modul. Geht nur in Chrome auf Android oder Chrome/Edge am Rechner, nicht auf dem iPhone und nicht in Firefox. Das Gerät darf nicht in den Bluetooth-Einstellungen des Handys gekoppelt sein, sonst dort erst entkoppeln. Bricht die Verbindung ab, verbindet sich das Rack von selbst neu. „Trennen“ beendet sie.</li>
 		<li><b>Eigene Klänge:</b> Das Modul Sampler spielt eine Audiodatei ab. Datei per Knopf laden oder auf das Modul ziehen.</li>
 		<li><b>Rhythmen:</b> Im Modul Beat Kästchen antippen. Im Sequencer macht der Knopf unter einem Schritt daraus eine Pause (–) oder hält den Ton davor (~).</li>
 		<li><b>Rückgängig:</b> „Zurück“ oder Strg+Z nimmt den letzten Schritt zurück, „Vor“ oder Strg+Umschalt+Z holt ihn wieder. Der Klang läuft dabei weiter.</li>

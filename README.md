@@ -16,6 +16,7 @@ The site is static files. There is no bundler and no backend. The interface is i
 - A rack that is open in a browser picks up new and changed modules within seconds, without a reload.
 - Compiled modules are kept in the browser, so a later start does not load the compiler.
 - Web MIDI: play the keyboard and pad modules, bind hardware knobs to rack knobs, send notes to a synth.
+- Bluetooth MIDI (BLE-MIDI) through Web Bluetooth, no extra app: a BLE keyboard plays the same modules. Needs Chrome on Android or Chrome/Edge on the desktop. Do not pair the device in the system settings first.
 - The patch is saved in the browser and exports to JSON.
 
 ## Run it locally
@@ -65,6 +66,7 @@ The rack builds the knobs from the Faust UI elements. Pitch follows 1 V per octa
 
 ```sh
 npm run modules           # compiles every module, without a browser
+npm run test:ble          # BLE-MIDI packet parser, plain Node
 npm run build
 node scripts/probe.mjs    # renders test patches offline and checks the numbers
 npm run check             # drives the built site in headless Chromium
@@ -100,6 +102,7 @@ Changes to `src/`, `index.html`, or `style.css` need `npm run build` and a reloa
 | `src/controls.js` | Maps a knob's travel to its value, also for MIDI and modulation. |
 | `src/keyboard.js`, `src/pads.js` | Keys and pads: screen, computer keyboard, MIDI. |
 | `src/midi.js`, `src/midiout.js` | Web MIDI: read inputs, send notes. |
+| `src/blemidi.js` | Bluetooth MIDI: BLE-MIDI packet parser, connect and reconnect. |
 | `src/life.js`, `src/life-world.js` | The world of the Leben module. |
 | `src/grid.js` | The Beat grid and the sequencer's step buttons. |
 | `src/sampler.js`, `src/samples.js` | The Sampler's file loader and where samples are kept. |
@@ -107,7 +110,7 @@ Changes to `src/`, `index.html`, or `style.css` need `npm run build` and a reloa
 | `src/explain.js` | The explain mode: its texts and the live look at a signal. |
 | `src/edits.js`, `src/evolve.js`, `src/web.js` | Editor storage, breeding of patch variants, the Web module's fetcher. |
 | `src/store.js` | A key-value table in IndexedDB, for samples and compiled modules. |
-| `scripts/` | `vendor`, `build`, `serve`, `check`, `modules`, `probe`. |
+| `scripts/` | `vendor`, `build`, `serve`, `check`, `modules`, `probe`, `blemidi-test`. |
 
 ## License
 

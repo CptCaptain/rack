@@ -15,7 +15,8 @@
     "build": "node scripts/build.mjs",
     "preview": "node scripts/serve.mjs dist",
     "check": "node scripts/check.mjs",
-    "modules": "node scripts/modules.mjs"
+    "modules": "node scripts/modules.mjs",
+    "test:ble": "node scripts/blemidi-test.mjs"
   },
   "dependencies": {
     "@grame/faustwasm": "^0.20.2"
